@@ -6,14 +6,16 @@ import sys
 import RPi.GPIO as GPIO
 import firebase_admin
 from firebase_admin import credentials, firestore
-from flask import Flask, request, render_template, jsonify
+from flask import Flask, request, render_template, jsonify, session, redirect, url_for
 import requests
 import logging
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 import google.api_core.exceptions
 from queue import Queue
 from dotenv import load_dotenv
+import hashlib
+import secrets
 
 # NEW/UPDATED imports for camera capture & upload
 import cv2
@@ -49,6 +51,7 @@ BASE_DIR = os.environ.get('BASE_DIR', '/home/maxpark')
 USER_DATA_FILE = os.path.join(BASE_DIR, "users.json")
 BLOCKED_USERS_FILE = os.path.join(BASE_DIR, "blocked_users.json")
 TRANSACTION_CACHE_FILE = os.path.join(BASE_DIR, "transactions_cache.json")
+DAILY_STATS_FILE = os.path.join(BASE_DIR, "daily_stats.json")
 FIREBASE_CRED_FILE = os.environ.get('FIREBASE_CRED_FILE', "service.json")
 
 # Ensure base directory exists
@@ -60,6 +63,76 @@ app.secret_key = os.environ.get('SECRET_KEY', 'your-secret-key-change-this')
 
 # Simple API key authentication
 API_KEY = os.environ.get('API_KEY', 'your-api-key-change-this')
+
+# Authentication configuration
+ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME', 'admin')
+ADMIN_PASSWORD_HASH = os.environ.get('ADMIN_PASSWORD_HASH', hashlib.sha256('admin123'.encode()).hexdigest())
+SESSION_SECRET = os.environ.get('SESSION_SECRET', secrets.token_hex(32))
+
+# Set session secret key
+app.secret_key = SESSION_SECRET
+
+# Store active sessions
+active_sessions = {}
+
+def cleanup_expired_sessions():
+    """Remove expired sessions"""
+    current_time = datetime.now()
+    expired_tokens = []
+    
+    for token, session_data in active_sessions.items():
+        if current_time > session_data['expires']:
+            expired_tokens.append(token)
+    
+    for token in expired_tokens:
+        del active_sessions[token]
+        logging.info(f"Expired session removed: {token[:8]}...")
+
+# Cleanup expired sessions every hour
+def session_cleanup_worker():
+    """Background worker to clean up expired sessions"""
+    while True:
+        try:
+            cleanup_expired_sessions()
+            time.sleep(3600)  # Check every hour
+        except Exception as e:
+            logging.error(f"Session cleanup error: {e}")
+            time.sleep(60)  # Retry in 1 minute on error
+
+def daily_stats_cleanup_worker():
+    """Background worker to clean up old daily statistics"""
+    while True:
+        try:
+            cleanup_old_daily_stats()
+            time.sleep(86400)  # Check every 24 hours
+        except Exception as e:
+            logging.error(f"Daily stats cleanup error: {e}")
+            time.sleep(3600)  # Retry in 1 hour on error
+
+def hash_password(password):
+    """Hash password using SHA-256"""
+    return hashlib.sha256(password.encode()).hexdigest()
+
+def generate_session_token():
+    """Generate a secure session token"""
+    return secrets.token_urlsafe(32)
+
+def is_authenticated():
+    """Check if user is authenticated"""
+    token = request.headers.get('Authorization', '').replace('Bearer ', '')
+    if not token:
+        token = request.args.get('token')
+    
+    return token in active_sessions
+
+def require_auth(f):
+    """Decorator to require authentication"""
+    def decorated_function(*args, **kwargs):
+        if not is_authenticated():
+            return jsonify({"status": "error", "message": "Authentication required"}), 401
+        return f(*args, **kwargs)
+    decorated_function.__name__ = f.__name__
+    return decorated_function
 
 def require_api_key(f):
     """Decorator to require API key for sensitive endpoints"""
@@ -245,6 +318,85 @@ def cache_transaction(transaction):
     txns = read_json_or_default(TRANSACTION_CACHE_FILE, [])
     txns.append(transaction)
     atomic_write_json(TRANSACTION_CACHE_FILE, txns)
+
+def update_daily_stats(status):
+    """Update daily statistics for access attempts."""
+    try:
+        today = datetime.now().strftime('%Y-%m-%d')
+        stats = read_json_or_default(DAILY_STATS_FILE, {})
+        
+        if today not in stats:
+            stats[today] = {
+                'date': today,
+                'valid_entries': 0,
+                'invalid_entries': 0,
+                'blocked_entries': 0
+            }
+        
+        if status == 'Access Granted':
+            stats[today]['valid_entries'] += 1
+        elif status == 'Access Denied':
+            stats[today]['invalid_entries'] += 1
+        elif status == 'Blocked':
+            stats[today]['blocked_entries'] += 1
+        
+        atomic_write_json(DAILY_STATS_FILE, stats)
+        
+        # Clean up old stats (keep only 20 days)
+        cleanup_old_daily_stats()
+        
+    except Exception as e:
+        logging.error(f"Error updating daily stats: {e}")
+
+def cleanup_old_daily_stats():
+    """Remove daily statistics older than 20 days."""
+    try:
+        stats = read_json_or_default(DAILY_STATS_FILE, {})
+        cutoff_date = datetime.now() - timedelta(days=20)
+        cutoff_str = cutoff_date.strftime('%Y-%m-%d')
+        
+        old_dates = [date for date in stats.keys() if date < cutoff_str]
+        for date in old_dates:
+            del stats[date]
+        
+        if old_dates:
+            atomic_write_json(DAILY_STATS_FILE, stats)
+            logging.info(f"Cleaned up {len(old_dates)} old daily statistics")
+            
+    except Exception as e:
+        logging.error(f"Error cleaning up daily stats: {e}")
+
+def get_daily_stats():
+    """Get daily statistics for the last 20 days."""
+    try:
+        stats = read_json_or_default(DAILY_STATS_FILE, {})
+        
+        # Generate last 20 days
+        today = datetime.now()
+        last_20_days = []
+        
+        for i in range(20):
+            date = today - timedelta(days=i)
+            date_str = date.strftime('%Y-%m-%d')
+            
+            if date_str in stats:
+                last_20_days.append(stats[date_str])
+            else:
+                last_20_days.append({
+                    'date': date_str,
+                    'valid_entries': 0,
+                    'invalid_entries': 0,
+                    'blocked_entries': 0
+                })
+        
+        # Sort by date (oldest first)
+        last_20_days.sort(key=lambda x: x['date'])
+        
+        return last_20_days
+        
+    except Exception as e:
+        logging.error(f"Error getting daily stats: {e}")
+        return []
 
 def sync_transactions():
     """Syncs offline transactions with Firebase when internet is restored."""
@@ -448,7 +600,118 @@ class WiegandDecoder:
 # =========================
 @app.route("/")
 def home():
+    return redirect(url_for('login'))
+
+@app.route("/login")
+def login():
+    return render_template("login.html")
+
+@app.route("/login", methods=["POST"])
+def login_post():
+    """Handle login authentication"""
+    try:
+        data = request.get_json()
+        username = data.get('username')
+        password = data.get('password')
+        
+        if not username or not password:
+            return jsonify({"status": "error", "message": "Username and password required"}), 400
+        
+        # Check credentials
+        if username == ADMIN_USERNAME and hash_password(password) == ADMIN_PASSWORD_HASH:
+            # Generate session token
+            token = generate_session_token()
+            active_sessions[token] = {
+                'username': username,
+                'login_time': datetime.now(),
+                'expires': datetime.now() + timedelta(hours=24)
+            }
+            
+            logging.info(f"User {username} logged in successfully")
+            return jsonify({
+                "status": "success", 
+                "message": "Login successful",
+                "token": token
+            })
+        else:
+            logging.warning(f"Failed login attempt for username: {username}")
+            return jsonify({"status": "error", "message": "Invalid username or password"}), 401
+            
+    except Exception as e:
+        logging.error(f"Login error: {e}")
+        return jsonify({"status": "error", "message": "Login failed"}), 500
+
+@app.route("/logout", methods=["POST"])
+def logout():
+    """Handle logout"""
+    try:
+        token = request.headers.get('Authorization', '').replace('Bearer ', '')
+        if token in active_sessions:
+            username = active_sessions[token]['username']
+            del active_sessions[token]
+            logging.info(f"User {username} logged out")
+            return jsonify({"status": "success", "message": "Logged out successfully"})
+        else:
+            return jsonify({"status": "error", "message": "Invalid session"}), 401
+    except Exception as e:
+        logging.error(f"Logout error: {e}")
+        return jsonify({"status": "error", "message": "Logout failed"}), 500
+
+@app.route("/dashboard")
+def dashboard():
+    """Main dashboard - requires authentication"""
     return render_template("index.html")
+
+@app.route("/change_password", methods=["POST"])
+def change_password():
+    """Change admin password"""
+    try:
+        token = request.headers.get('Authorization', '').replace('Bearer ', '')
+        if token not in active_sessions:
+            return jsonify({"status": "error", "message": "Authentication required"}), 401
+        
+        data = request.get_json()
+        current_password = data.get('current_password')
+        new_password = data.get('new_password')
+        
+        if not current_password or not new_password:
+            return jsonify({"status": "error", "message": "Current and new password required"}), 400
+        
+        # Verify current password
+        if hash_password(current_password) != ADMIN_PASSWORD_HASH:
+            return jsonify({"status": "error", "message": "Current password is incorrect"}), 401
+        
+        # Update password hash
+        new_password_hash = hash_password(new_password)
+        
+        # Update environment variable (this would need to be persisted to .env file)
+        global ADMIN_PASSWORD_HASH
+        ADMIN_PASSWORD_HASH = new_password_hash
+        
+        # Update .env file
+        env_file = ".env"
+        env_vars = {}
+        
+        if os.path.exists(env_file):
+            with open(env_file, 'r') as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith('#') and '=' in line:
+                        key, value = line.split('=', 1)
+                        env_vars[key] = value
+        
+        env_vars['ADMIN_PASSWORD_HASH'] = new_password_hash
+        
+        with open(env_file, 'w') as f:
+            for key, value in env_vars.items():
+                f.write(f"{key}={value}\n")
+        
+        logging.info(f"Password changed for user: {active_sessions[token]['username']}")
+        return jsonify({"status": "success", "message": "Password changed successfully"})
+        
+    except Exception as e:
+        logging.error(f"Password change error: {e}")
+        return jsonify({"status": "error", "message": "Password change failed"}), 500
 
 @app.route("/status")
 def system_status():
@@ -868,6 +1131,146 @@ def update_config():
         logging.error(f"Error updating configuration: {e}")
         return jsonify({"status": "error", "message": f"Error updating configuration: {str(e)}"}), 500
 
+# --- Storage & Analytics ---
+@app.route("/get_storage_stats", methods=["GET"])
+def get_storage_stats():
+    """Get storage statistics and daily analytics."""
+    try:
+        import shutil
+        
+        # Get disk usage
+        total, used, free = shutil.disk_usage(BASE_DIR)
+        
+        # Calculate image storage
+        images_size = 0
+        total_images = 0
+        if os.path.exists(IMAGES_DIR):
+            for filename in os.listdir(IMAGES_DIR):
+                if filename.lower().endswith(('.jpg', '.jpeg')):
+                    filepath = os.path.join(IMAGES_DIR, filename)
+                    if os.path.isfile(filepath):
+                        images_size += os.path.getsize(filepath)
+                        total_images += 1
+        
+        # Calculate system files size
+        system_files_size = 0
+        system_files = [
+            USER_DATA_FILE,
+            BLOCKED_USERS_FILE,
+            TRANSACTION_CACHE_FILE,
+            DAILY_STATS_FILE,
+            LOG_FILE
+        ]
+        
+        for file_path in system_files:
+            if os.path.exists(file_path):
+                system_files_size += os.path.getsize(file_path)
+        
+        # Get daily statistics
+        daily_stats = get_daily_stats()
+        
+        return jsonify({
+            "total_images": total_images,
+            "images_size": images_size,
+            "system_files_size": system_files_size,
+            "free_space": free,
+            "total_space": total,
+            "used_space": used,
+            "daily_stats": daily_stats
+        })
+        
+    except Exception as e:
+        logging.error(f"Error getting storage stats: {e}")
+        return jsonify({"status": "error", "message": f"Error getting storage stats: {str(e)}"}), 500
+
+@app.route("/cleanup_old_images", methods=["POST"])
+@require_auth
+def cleanup_old_images():
+    """Clean up old images based on days to keep."""
+    try:
+        data = request.get_json()
+        days_to_keep = data.get('days_to_keep', 30)
+        
+        if not os.path.exists(IMAGES_DIR):
+            return jsonify({"status": "success", "deleted_count": 0, "message": "No images directory found"})
+        
+        cutoff_time = time.time() - (days_to_keep * 24 * 60 * 60)
+        deleted_count = 0
+        
+        for filename in os.listdir(IMAGES_DIR):
+            if filename.lower().endswith(('.jpg', '.jpeg')):
+                filepath = os.path.join(IMAGES_DIR, filename)
+                if os.path.isfile(filepath):
+                    file_mtime = os.path.getmtime(filepath)
+                    if file_mtime < cutoff_time:
+                        try:
+                            os.remove(filepath)
+                            # Also remove upload sidecar if exists
+                            sidecar_path = filepath + ".uploaded.json"
+                            if os.path.exists(sidecar_path):
+                                os.remove(sidecar_path)
+                            deleted_count += 1
+                        except Exception as e:
+                            logging.error(f"Error deleting {filepath}: {e}")
+        
+        logging.info(f"Cleaned up {deleted_count} old images")
+        return jsonify({
+            "status": "success",
+            "deleted_count": deleted_count,
+            "message": f"Cleaned up {deleted_count} old images"
+        })
+        
+    except Exception as e:
+        logging.error(f"Error cleaning up old images: {e}")
+        return jsonify({"status": "error", "message": f"Error cleaning up images: {str(e)}"}), 500
+
+@app.route("/cleanup_old_stats", methods=["POST"])
+@require_auth
+def cleanup_old_stats():
+    """Clean up statistics older than 20 days."""
+    try:
+        stats = read_json_or_default(DAILY_STATS_FILE, {})
+        cutoff_date = datetime.now() - timedelta(days=20)
+        cutoff_str = cutoff_date.strftime('%Y-%m-%d')
+        
+        old_dates = [date for date in stats.keys() if date < cutoff_str]
+        deleted_count = len(old_dates)
+        
+        for date in old_dates:
+            del stats[date]
+        
+        if old_dates:
+            atomic_write_json(DAILY_STATS_FILE, stats)
+        
+        logging.info(f"Cleaned up {deleted_count} old daily statistics")
+        return jsonify({
+            "status": "success",
+            "deleted_count": deleted_count,
+            "message": f"Cleaned up {deleted_count} old statistics"
+        })
+        
+    except Exception as e:
+        logging.error(f"Error cleaning up old stats: {e}")
+        return jsonify({"status": "error", "message": f"Error cleaning up stats: {str(e)}"}), 500
+
+@app.route("/clear_all_stats", methods=["POST"])
+@require_auth
+def clear_all_stats():
+    """Clear all daily statistics."""
+    try:
+        if os.path.exists(DAILY_STATS_FILE):
+            os.remove(DAILY_STATS_FILE)
+        
+        logging.info("Cleared all daily statistics")
+        return jsonify({
+            "status": "success",
+            "message": "All statistics cleared"
+        })
+        
+    except Exception as e:
+        logging.error(f"Error clearing all stats: {e}")
+        return jsonify({"status": "error", "message": f"Error clearing stats: {str(e)}"}), 500
+
 # --- Block/Unblock ---
 @app.route("/block_user", methods=["GET"])
 @require_api_key
@@ -1077,6 +1480,9 @@ def handle_access(bits, value, reader_id):
             "timestamp": timestamp,
             "reader": reader_id
         }
+
+        # Update daily statistics
+        update_daily_stats(status)
 
         try:
             transaction_queue.put(transaction)
@@ -1299,6 +1705,8 @@ else:
 threading.Thread(target=sync_loop, daemon=True).start()
 threading.Thread(target=transaction_uploader, daemon=True).start()
 threading.Thread(target=image_uploader_worker, daemon=True).start()
+threading.Thread(target=session_cleanup_worker, daemon=True).start()
+threading.Thread(target=daily_stats_cleanup_worker, daemon=True).start()
 
 # Flask serve
 try:

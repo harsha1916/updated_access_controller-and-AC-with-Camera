@@ -98,6 +98,16 @@
                     <i class="fas fa-cog"></i> Configuration
                 </button>
             </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="password-tab" data-bs-toggle="tab" data-bs-target="#password" type="button" role="tab">
+                    <i class="fas fa-key"></i> Change Password
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="storage-tab" data-bs-toggle="tab" data-bs-target="#storage" type="button" role="tab">
+                    <i class="fas fa-chart-pie"></i> Storage & Analytics
+                </button>
+            </li>
         </ul>
     </div>
 
@@ -416,6 +426,218 @@
             </div>
         </div>
     </div>
+
+    <!-- Change Password Tab -->
+    <div class="tab-pane fade" id="password" role="tabpanel">
+        <div class="container-fluid mt-3">
+            <div class="row justify-content-center">
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0"><i class="fas fa-key"></i> Change Password</h5>
+                        </div>
+                        <div class="card-body">
+                            <form id="changePasswordForm">
+                                <div class="mb-3">
+                                    <label for="currentPassword" class="form-label">Current Password</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text">
+                                            <i class="fas fa-lock"></i>
+                                        </span>
+                                        <input type="password" class="form-control" id="currentPassword" required>
+                                        <button class="btn btn-outline-secondary" type="button" onclick="togglePassword('currentPassword')">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label for="newPassword" class="form-label">New Password</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text">
+                                            <i class="fas fa-key"></i>
+                                        </span>
+                                        <input type="password" class="form-control" id="newPassword" required minlength="6">
+                                        <button class="btn btn-outline-secondary" type="button" onclick="togglePassword('newPassword')">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                    </div>
+                                    <div class="form-text">Password must be at least 6 characters long</div>
+                                </div>
+                                
+                                <div class="mb-4">
+                                    <label for="confirmPassword" class="form-label">Confirm New Password</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text">
+                                            <i class="fas fa-check"></i>
+                                        </span>
+                                        <input type="password" class="form-control" id="confirmPassword" required>
+                                        <button class="btn btn-outline-secondary" type="button" onclick="togglePassword('confirmPassword')">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                <div class="d-grid">
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-save"></i> Change Password
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                    
+                    <!-- Logout Section -->
+                    <div class="card mt-4">
+                        <div class="card-header">
+                            <h5 class="mb-0"><i class="fas fa-sign-out-alt"></i> Session Management</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <strong>Logged in as:</strong> <span id="currentUsername">admin</span><br>
+                                    <small class="text-muted">Session expires in 24 hours</small>
+                                </div>
+                                <button class="btn btn-outline-danger" onclick="logout()">
+                                    <i class="fas fa-sign-out-alt"></i> Logout
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Storage & Analytics Tab -->
+    <div class="tab-pane fade" id="storage" role="tabpanel">
+        <div class="container-fluid mt-3">
+            <!-- Storage Overview -->
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0"><i class="fas fa-hdd"></i> Storage Usage</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-6">
+                                    <canvas id="storagePieChart" width="200" height="200"></canvas>
+                                </div>
+                                <div class="col-6">
+                                    <div class="storage-stats">
+                                        <div class="mb-2">
+                                            <strong>Total Images:</strong> <span id="totalImagesCount">0</span>
+                                        </div>
+                                        <div class="mb-2">
+                                            <strong>Images Size:</strong> <span id="imagesSize">0 MB</span>
+                                        </div>
+                                        <div class="mb-2">
+                                            <strong>System Files:</strong> <span id="systemFilesSize">0 MB</span>
+                                        </div>
+                                        <div class="mb-2">
+                                            <strong>Free Space:</strong> <span id="freeSpace">0 MB</span>
+                                        </div>
+                                        <div class="mb-2">
+                                            <strong>Total Space:</strong> <span id="totalSpace">0 MB</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0"><i class="fas fa-chart-line"></i> Daily Access Statistics</h5>
+                        </div>
+                        <div class="card-body">
+                            <canvas id="dailyStatsChart" width="400" height="200"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Detailed Statistics -->
+            <div class="row">
+                <div class="col-md-12">
+                    <div class="card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0"><i class="fas fa-chart-bar"></i> 20-Day Access Statistics</h5>
+                            <div>
+                                <button class="btn btn-sm btn-outline-primary" onclick="refreshStorageData()">
+                                    <i class="fas fa-sync-alt"></i> Refresh
+                                </button>
+                                <button class="btn btn-sm btn-outline-danger" onclick="clearOldStats()">
+                                    <i class="fas fa-trash"></i> Clear Old Data
+                                </button>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <div class="stat-card text-center p-3 border rounded">
+                                        <h3 class="text-success" id="totalValidEntries">0</h3>
+                                        <p class="mb-0">Total Valid Entries</p>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="stat-card text-center p-3 border rounded">
+                                        <h3 class="text-danger" id="totalInvalidEntries">0</h3>
+                                        <p class="mb-0">Total Invalid Entries</p>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="stat-card text-center p-3 border rounded">
+                                        <h3 class="text-info" id="totalBlockedEntries">0</h3>
+                                        <p class="mb-0">Total Blocked Entries</p>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="mt-4">
+                                <canvas id="detailedStatsChart" width="800" height="300"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Storage Management -->
+            <div class="row mt-4">
+                <div class="col-md-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0"><i class="fas fa-tools"></i> Storage Management</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h6>Image Cleanup</h6>
+                                    <p class="text-muted">Remove old images to free up space</p>
+                                    <div class="input-group mb-3">
+                                        <input type="number" class="form-control" id="daysToKeep" placeholder="Days to keep" value="30" min="1" max="365">
+                                        <button class="btn btn-outline-warning" onclick="cleanupOldImages()">
+                                            <i class="fas fa-broom"></i> Cleanup Old Images
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <h6>Statistics Cleanup</h6>
+                                    <p class="text-muted">Remove statistics older than 20 days</p>
+                                    <button class="btn btn-outline-danger" onclick="cleanupOldStats()">
+                                        <i class="fas fa-trash"></i> Cleanup Old Statistics
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
     <!-- Floating Refresh Button -->
@@ -446,6 +668,7 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
         let refreshInterval;
         let isRefreshing = false;
@@ -737,6 +960,17 @@
             document.getElementById('users-tab').addEventListener('click', function() {
                 loadUserList();
             });
+
+            // Load storage data when Storage tab is clicked
+            document.getElementById('storage-tab').addEventListener('click', function() {
+                loadStorageData();
+            });
+
+            // Change password form
+            document.getElementById('changePasswordForm').addEventListener('submit', async function(e) {
+                e.preventDefault();
+                await changePassword();
+            });
         }
 
         // =========================
@@ -775,6 +1009,11 @@
         async function deleteUser() {
             const cardNumber = document.getElementById('deleteCardNumber').value;
 
+            if (!cardNumber) {
+                showNotification('Please enter a card number', 'warning');
+                return;
+            }
+
             try {
                 const params = new URLSearchParams({
                     api_key: getApiKey(),
@@ -798,6 +1037,11 @@
 
         async function blockUser() {
             const cardNumber = document.getElementById('blockCardNumber').value;
+
+            if (!cardNumber) {
+                showNotification('Please enter a card number', 'warning');
+                return;
+            }
 
             try {
                 const params = new URLSearchParams({
@@ -823,6 +1067,11 @@
         async function unblockUser() {
             const cardNumber = document.getElementById('unblockCardNumber').value;
 
+            if (!cardNumber) {
+                showNotification('Please enter a card number', 'warning');
+                return;
+            }
+
             try {
                 const params = new URLSearchParams({
                     api_key: getApiKey(),
@@ -847,6 +1096,11 @@
         async function searchUser() {
             const userId = document.getElementById('searchUserId').value;
 
+            if (!userId) {
+                showNotification('Please enter a user ID', 'warning');
+                return;
+            }
+
             try {
                 const params = new URLSearchParams({
                     id: userId
@@ -858,6 +1112,7 @@
                 if (result.status === 'success' && result.users.length > 0) {
                     const user = result.users[0];
                     showNotification(`Found user: ${user.name} (Card: ${user.card_number})`, 'success');
+                    document.getElementById('searchUserForm').reset();
                 } else {
                     showNotification('User not found', 'warning');
                 }
@@ -1071,6 +1326,387 @@
         function getApiKey() {
             const apiKeyElement = document.getElementById('apiKey');
             return apiKeyElement ? apiKeyElement.value || 'your-api-key-change-this' : 'your-api-key-change-this';
+        }
+
+        // =========================
+        // Authentication Functions
+        // =========================
+        function getAuthToken() {
+            return localStorage.getItem('auth_token');
+        }
+
+        function getAuthHeaders() {
+            const token = getAuthToken();
+            return {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            };
+        }
+
+        async function logout() {
+            try {
+                const response = await fetch('/logout', {
+                    method: 'POST',
+                    headers: getAuthHeaders()
+                });
+                
+                const result = await response.json();
+                if (result.status === 'success') {
+                    localStorage.removeItem('auth_token');
+                    localStorage.removeItem('username');
+                    window.location.href = '/login';
+                } else {
+                    showNotification('Logout failed', 'danger');
+                }
+            } catch (error) {
+                showNotification('Logout error: ' + error.message, 'danger');
+            }
+        }
+
+        async function changePassword() {
+            const currentPassword = document.getElementById('currentPassword').value;
+            const newPassword = document.getElementById('newPassword').value;
+            const confirmPassword = document.getElementById('confirmPassword').value;
+
+            if (!currentPassword || !newPassword || !confirmPassword) {
+                showNotification('Please fill in all fields', 'warning');
+                return;
+            }
+
+            if (newPassword.length < 6) {
+                showNotification('New password must be at least 6 characters long', 'warning');
+                return;
+            }
+
+            if (newPassword !== confirmPassword) {
+                showNotification('New passwords do not match', 'warning');
+                return;
+            }
+
+            try {
+                const response = await fetch('/change_password', {
+                    method: 'POST',
+                    headers: getAuthHeaders(),
+                    body: JSON.stringify({
+                        current_password: currentPassword,
+                        new_password: newPassword
+                    })
+                });
+
+                const result = await response.json();
+                if (result.status === 'success') {
+                    showNotification('Password changed successfully!', 'success');
+                    document.getElementById('changePasswordForm').reset();
+                } else {
+                    showNotification(result.message || 'Password change failed', 'danger');
+                }
+            } catch (error) {
+                showNotification('Password change error: ' + error.message, 'danger');
+            }
+        }
+
+        function togglePassword(fieldId) {
+            const field = document.getElementById(fieldId);
+            const icon = field.nextElementSibling.querySelector('i');
+            
+            if (field.type === 'password') {
+                field.type = 'text';
+                icon.classList.remove('fa-eye');
+                icon.classList.add('fa-eye-slash');
+            } else {
+                field.type = 'password';
+                icon.classList.remove('fa-eye-slash');
+                icon.classList.add('fa-eye');
+            }
+        }
+
+        // Check authentication on page load
+        function checkAuthentication() {
+            const token = getAuthToken();
+            if (!token) {
+                window.location.href = '/login';
+                return;
+            }
+            
+            // Set current username
+            const username = localStorage.getItem('username');
+            if (username) {
+                document.getElementById('currentUsername').textContent = username;
+            }
+        }
+
+        // Initialize authentication check
+        checkAuthentication();
+
+        // =========================
+        // Storage & Analytics Functions
+        // =========================
+        let storagePieChart = null;
+        let dailyStatsChart = null;
+        let detailedStatsChart = null;
+
+        async function loadStorageData() {
+            try {
+                const response = await fetch('/get_storage_stats');
+                const data = await response.json();
+                
+                updateStorageStats(data);
+                createStoragePieChart(data);
+                createDailyStatsChart(data.daily_stats);
+                createDetailedStatsChart(data.daily_stats);
+                updateStatisticsCards(data.daily_stats);
+                
+            } catch (error) {
+                console.error('Error loading storage data:', error);
+                showNotification('Error loading storage data', 'danger');
+            }
+        }
+
+        function updateStorageStats(data) {
+            document.getElementById('totalImagesCount').textContent = data.total_images;
+            document.getElementById('imagesSize').textContent = formatBytes(data.images_size);
+            document.getElementById('systemFilesSize').textContent = formatBytes(data.system_files_size);
+            document.getElementById('freeSpace').textContent = formatBytes(data.free_space);
+            document.getElementById('totalSpace').textContent = formatBytes(data.total_space);
+        }
+
+        function createStoragePieChart(data) {
+            const ctx = document.getElementById('storagePieChart').getContext('2d');
+            
+            if (storagePieChart) {
+                storagePieChart.destroy();
+            }
+            
+            storagePieChart = new Chart(ctx, {
+                type: 'pie',
+                data: {
+                    labels: ['Images', 'System Files', 'Free Space'],
+                    datasets: [{
+                        data: [data.images_size, data.system_files_size, data.free_space],
+                        backgroundColor: [
+                            '#FF6384',
+                            '#36A2EB',
+                            '#4BC0C0'
+                        ],
+                        borderWidth: 2,
+                        borderColor: '#fff'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return context.label + ': ' + formatBytes(context.parsed);
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function createDailyStatsChart(dailyStats) {
+            const ctx = document.getElementById('dailyStatsChart').getContext('2d');
+            
+            if (dailyStatsChart) {
+                dailyStatsChart.destroy();
+            }
+            
+            const labels = dailyStats.map(stat => stat.date);
+            const validData = dailyStats.map(stat => stat.valid_entries);
+            const invalidData = dailyStats.map(stat => stat.invalid_entries);
+            const blockedData = dailyStats.map(stat => stat.blocked_entries);
+            
+            dailyStatsChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Valid Entries',
+                            data: validData,
+                            borderColor: '#28a745',
+                            backgroundColor: 'rgba(40, 167, 69, 0.1)',
+                            tension: 0.4
+                        },
+                        {
+                            label: 'Invalid Entries',
+                            data: invalidData,
+                            borderColor: '#dc3545',
+                            backgroundColor: 'rgba(220, 53, 69, 0.1)',
+                            tension: 0.4
+                        },
+                        {
+                            label: 'Blocked Entries',
+                            data: blockedData,
+                            borderColor: '#ffc107',
+                            backgroundColor: 'rgba(255, 193, 7, 0.1)',
+                            tension: 0.4
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+
+        function createDetailedStatsChart(dailyStats) {
+            const ctx = document.getElementById('detailedStatsChart').getContext('2d');
+            
+            if (detailedStatsChart) {
+                detailedStatsChart.destroy();
+            }
+            
+            const labels = dailyStats.map(stat => stat.date);
+            const validData = dailyStats.map(stat => stat.valid_entries);
+            const invalidData = dailyStats.map(stat => stat.invalid_entries);
+            const blockedData = dailyStats.map(stat => stat.blocked_entries);
+            
+            detailedStatsChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Valid Entries',
+                            data: validData,
+                            backgroundColor: '#28a745',
+                            borderColor: '#1e7e34',
+                            borderWidth: 1
+                        },
+                        {
+                            label: 'Invalid Entries',
+                            data: invalidData,
+                            backgroundColor: '#dc3545',
+                            borderColor: '#bd2130',
+                            borderWidth: 1
+                        },
+                        {
+                            label: 'Blocked Entries',
+                            data: blockedData,
+                            backgroundColor: '#ffc107',
+                            borderColor: '#e0a800',
+                            borderWidth: 1
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        x: {
+                            stacked: true
+                        },
+                        y: {
+                            stacked: true,
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateStatisticsCards(dailyStats) {
+            const totalValid = dailyStats.reduce((sum, stat) => sum + stat.valid_entries, 0);
+            const totalInvalid = dailyStats.reduce((sum, stat) => sum + stat.invalid_entries, 0);
+            const totalBlocked = dailyStats.reduce((sum, stat) => sum + stat.blocked_entries, 0);
+            
+            document.getElementById('totalValidEntries').textContent = totalValid;
+            document.getElementById('totalInvalidEntries').textContent = totalInvalid;
+            document.getElementById('totalBlockedEntries').textContent = totalBlocked;
+        }
+
+        function formatBytes(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        async function refreshStorageData() {
+            await loadStorageData();
+            showNotification('Storage data refreshed', 'success');
+        }
+
+        async function cleanupOldImages() {
+            const daysToKeep = document.getElementById('daysToKeep').value;
+            if (!daysToKeep || daysToKeep < 1) {
+                showNotification('Please enter a valid number of days', 'warning');
+                return;
+            }
+            
+            if (confirm(`Are you sure you want to delete images older than ${daysToKeep} days?`)) {
+                try {
+                    const response = await fetch('/cleanup_old_images', {
+                        method: 'POST',
+                        headers: getAuthHeaders(),
+                        body: JSON.stringify({ days_to_keep: parseInt(daysToKeep) })
+                    });
+                    
+                    const result = await response.json();
+                    if (result.status === 'success') {
+                        showNotification(`Cleaned up ${result.deleted_count} old images`, 'success');
+                        await loadStorageData();
+                    } else {
+                        showNotification(result.message || 'Cleanup failed', 'danger');
+                    }
+                } catch (error) {
+                    showNotification('Cleanup error: ' + error.message, 'danger');
+                }
+            }
+        }
+
+        async function cleanupOldStats() {
+            if (confirm('Are you sure you want to delete statistics older than 20 days?')) {
+                try {
+                    const response = await fetch('/cleanup_old_stats', {
+                        method: 'POST',
+                        headers: getAuthHeaders()
+                    });
+                    
+                    const result = await response.json();
+                    if (result.status === 'success') {
+                        showNotification(`Cleaned up ${result.deleted_count} old statistics`, 'success');
+                        await loadStorageData();
+                    } else {
+                        showNotification(result.message || 'Cleanup failed', 'danger');
+                    }
+                } catch (error) {
+                    showNotification('Cleanup error: ' + error.message, 'danger');
+                }
+            }
+        }
+
+        async function clearOldStats() {
+            if (confirm('Are you sure you want to clear all statistics data?')) {
+                try {
+                    const response = await fetch('/clear_all_stats', {
+                        method: 'POST',
+                        headers: getAuthHeaders()
+                    });
+                    
+                    const result = await response.json();
+                    if (result.status === 'success') {
+                        showNotification('All statistics cleared', 'success');
+                        await loadStorageData();
+                    } else {
+                        showNotification(result.message || 'Clear failed', 'danger');
+                    }
+                } catch (error) {
+                    showNotification('Clear error: ' + error.message, 'danger');
+                }
+            }
         }
     </script>
 </body>
