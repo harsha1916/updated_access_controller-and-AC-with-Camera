@@ -732,6 +732,11 @@
             document.getElementById('cameraPassword').addEventListener('input', updateRtspUrls);
             document.getElementById('camera1Ip').addEventListener('input', updateRtspUrls);
             document.getElementById('camera2Ip').addEventListener('input', updateRtspUrls);
+
+            // Load user list when User Management tab is clicked
+            document.getElementById('users-tab').addEventListener('click', function() {
+                loadUserList();
+            });
         }
 
         // =========================
@@ -879,6 +884,7 @@
                             <div class="row align-items-center">
                                 <div class="col-md-3">
                                     <strong>${user.name}</strong>
+                                    ${user.blocked ? '<span class="badge bg-warning ms-2">Blocked</span>' : '<span class="badge bg-success ms-2">Active</span>'}
                                 </div>
                                 <div class="col-md-2">
                                     <small class="text-muted">Card: ${user.card_number}</small>
@@ -890,12 +896,17 @@
                                     <small class="text-muted">Ref: ${user.ref_id || 'N/A'}</small>
                                 </div>
                                 <div class="col-md-3 text-end">
-                                    <button class="btn btn-sm btn-outline-danger" onclick="deleteUserByCard('${user.card_number}')">
+                                    <button class="btn btn-sm btn-outline-danger me-1" onclick="deleteUserByCard('${user.card_number}')" title="Delete User">
                                         <i class="fas fa-trash"></i>
                                     </button>
-                                    <button class="btn btn-sm btn-outline-warning" onclick="blockUserByCard('${user.card_number}')">
-                                        <i class="fas fa-ban"></i>
-                                    </button>
+                                    ${user.blocked ? 
+                                        `<button class="btn btn-sm btn-outline-success" onclick="unblockUserByCard('${user.card_number}')" title="Unblock User">
+                                            <i class="fas fa-check"></i>
+                                        </button>` :
+                                        `<button class="btn btn-sm btn-outline-warning" onclick="blockUserByCard('${user.card_number}')" title="Block User">
+                                            <i class="fas fa-ban"></i>
+                                        </button>`
+                                    }
                                 </div>
                             </div>
                         </div>
@@ -904,6 +915,7 @@
 
                 container.innerHTML = usersHtml;
             } catch (error) {
+                console.error('Error loading users:', error);
                 document.getElementById('userListContainer').innerHTML = 
                     '<div class="text-center text-danger">Error loading users</div>';
             }
@@ -920,6 +932,13 @@
             if (confirm(`Are you sure you want to block user with card ${cardNumber}?`)) {
                 document.getElementById('blockCardNumber').value = cardNumber;
                 await blockUser();
+            }
+        }
+
+        async function unblockUserByCard(cardNumber) {
+            if (confirm(`Are you sure you want to unblock user with card ${cardNumber}?`)) {
+                document.getElementById('unblockCardNumber').value = cardNumber;
+                await unblockUser();
             }
         }
 
@@ -1050,7 +1069,8 @@
         }
 
         function getApiKey() {
-            return document.getElementById('apiKey').value || 'your-api-key-change-this';
+            const apiKeyElement = document.getElementById('apiKey');
+            return apiKeyElement ? apiKeyElement.value || 'your-api-key-change-this' : 'your-api-key-change-this';
         }
     </script>
 </body>

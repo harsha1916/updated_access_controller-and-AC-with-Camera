@@ -508,15 +508,8 @@ def add_user():
         curr[card_number] = user_data
         save_local_users(curr)  # updates dict + ALLOWED_SET
 
-        if is_internet_available() and db is not None:
-            try:
-                db.collection("users").document(card_number).set(user_data)
-            except google.api_core.exceptions.DeadlineExceeded:
-                logging.warning(f"Firestore transaction timeout for card {card_number}")
-            except Exception as e:
-                logging.error(f"Firestore error add_user: {e}")
-
-        return jsonify({"status": "success", "message": "User added locally and will sync online."})
+        logging.info(f"User added locally: {name} (Card: {card_number})")
+        return jsonify({"status": "success", "message": "User added successfully."})
     except Exception as e:
         return jsonify({"status": "error", "message": f"Error: {str(e)}"}), 500
 
@@ -530,16 +523,11 @@ def delete_user():
 
         curr = load_local_users()
         if card_number in curr:
+            user_name = curr[card_number].get("name", "Unknown")
             del curr[card_number]
             save_local_users(curr)  # updates dict + ALLOWED_SET
-            if is_internet_available() and db is not None:
-                try:
-                    db.collection("users").document(card_number).delete()
-                except google.api_core.exceptions.DeadlineExceeded:
-                    logging.warning("Firestore transaction timeout ....")
-                except Exception as e:
-                    logging.error(f"Firestore error delete_user: {e}")
-            return jsonify({"status": "success", "message": "User deleted (local). Will sync online."})
+            logging.info(f"User deleted locally: {user_name} (Card: {card_number})")
+            return jsonify({"status": "success", "message": "User deleted successfully."})
         else:
             return jsonify({"status": "error", "message": "User not found."}), 404
     except Exception as e:
@@ -779,9 +767,10 @@ def delete_image(filename):
 # --- User Management ---
 @app.route("/get_users", methods=["GET"])
 def get_users():
-    """Get list of all users."""
+    """Get list of all users with blocked status."""
     try:
         users_data = load_local_users()
+        blocked_data = load_blocked_users()
         users_list = []
         
         for card_number, user_data in users_data.items():
@@ -789,8 +778,12 @@ def get_users():
                 "card_number": card_number,
                 "id": user_data.get("id", ""),
                 "name": user_data.get("name", ""),
-                "ref_id": user_data.get("ref_id", "")
+                "ref_id": user_data.get("ref_id", ""),
+                "blocked": blocked_data.get(card_number, False)
             })
+        
+        # Sort by name for better display
+        users_list.sort(key=lambda x: x["name"].lower())
         
         return jsonify(users_list)
         
@@ -888,15 +881,8 @@ def block_user():
         curr[card_number] = True
         save_blocked_users(curr)  # updates dict + BLOCKED_SET
 
-        if is_internet_available() and db is not None:
-            try:
-                db.collection("users").document(card_number).set({"blocked": True}, merge=True)
-            except google.api_core.exceptions.DeadlineExceeded:
-                logging.warning("Firestore transaction timeout ....")
-            except Exception as e:
-                logging.error(f"Firestore error block_user: {e}")
-
-        return jsonify({"status": "success", "message": f"User {card_number} blocked locally; will sync."})
+        logging.info(f"User blocked locally: Card {card_number}")
+        return jsonify({"status": "success", "message": f"User {card_number} blocked successfully."})
     except Exception as e:
         return jsonify({"status": "error", "message": f"Error blocking user: {str(e)}"}), 500
 
@@ -913,15 +899,8 @@ def unblock_user():
             curr.pop(card_number, None)
             save_blocked_users(curr)  # updates dict + BLOCKED_SET
 
-            if is_internet_available() and db is not None:
-                try:
-                    db.collection("users").document(card_number).set({"blocked": False}, merge=True)
-                except google.api_core.exceptions.DeadlineExceeded:
-                    logging.warning("Firestore transaction timeout ....")
-                except Exception as e:
-                    logging.error(f"Firestore error unblock_user: {e}")
-
-            return jsonify({"status": "success", "message": f"User {card_number} unblocked locally; will sync."})
+            logging.info(f"User unblocked locally: Card {card_number}")
+            return jsonify({"status": "success", "message": f"User {card_number} unblocked successfully."})
         else:
             return jsonify({"status": "error", "message": "User is not blocked."}), 404
     except Exception as e:
