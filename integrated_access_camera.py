@@ -776,6 +776,105 @@ def delete_image(filename):
         logging.error(f"Error deleting image {filename}: {e}")
         return jsonify({"status": "error", "message": f"Error deleting image: {str(e)}"}), 500
 
+# --- User Management ---
+@app.route("/get_users", methods=["GET"])
+def get_users():
+    """Get list of all users."""
+    try:
+        users_data = load_local_users()
+        users_list = []
+        
+        for card_number, user_data in users_data.items():
+            users_list.append({
+                "card_number": card_number,
+                "id": user_data.get("id", ""),
+                "name": user_data.get("name", ""),
+                "ref_id": user_data.get("ref_id", "")
+            })
+        
+        return jsonify(users_list)
+        
+    except Exception as e:
+        logging.error(f"Error fetching users: {e}")
+        return jsonify({"status": "error", "message": f"Error fetching users: {str(e)}"}), 500
+
+# --- Configuration Management ---
+@app.route("/get_config", methods=["GET"])
+def get_config():
+    """Get current system configuration."""
+    try:
+        config = {
+            "camera_username": os.getenv("CAMERA_USERNAME", "admin"),
+            "camera_password": os.getenv("CAMERA_PASSWORD", "admin"),
+            "camera_1_ip": os.getenv("CAMERA_1_IP", "192.168.1.201"),
+            "camera_2_ip": os.getenv("CAMERA_2_IP", "192.168.1.202"),
+            "s3_api_url": os.getenv("S3_API_URL", "https://api.easyparkai.com/api/Common/Upload?modulename=anpr"),
+            "max_retries": int(os.getenv("MAX_RETRIES", "5")),
+            "retry_delay": int(os.getenv("RETRY_DELAY", "5")),
+            "bind_ip": os.getenv("BIND_IP", "192.168.1.33"),
+            "bind_port": int(os.getenv("BIND_PORT", "9000")),
+            "api_key": os.getenv("API_KEY", "your-api-key-change-this")
+        }
+        
+        return jsonify(config)
+        
+    except Exception as e:
+        logging.error(f"Error fetching configuration: {e}")
+        return jsonify({"status": "error", "message": f"Error fetching configuration: {str(e)}"}), 500
+
+@app.route("/update_config", methods=["POST"])
+@require_api_key
+def update_config():
+    """Update system configuration."""
+    try:
+        config_data = request.get_json()
+        
+        if not config_data:
+            return jsonify({"status": "error", "message": "No configuration data provided"}), 400
+        
+        # Create or update .env file
+        env_file = ".env"
+        env_vars = {}
+        
+        # Read existing .env file if it exists
+        if os.path.exists(env_file):
+            with open(env_file, 'r') as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith('#') and '=' in line:
+                        key, value = line.split('=', 1)
+                        env_vars[key] = value
+        
+        # Update with new values
+        config_mapping = {
+            "camera_username": "CAMERA_USERNAME",
+            "camera_password": "CAMERA_PASSWORD", 
+            "camera_1_ip": "CAMERA_1_IP",
+            "camera_2_ip": "CAMERA_2_IP",
+            "s3_api_url": "S3_API_URL",
+            "max_retries": "MAX_RETRIES",
+            "retry_delay": "RETRY_DELAY",
+            "bind_ip": "BIND_IP",
+            "bind_port": "BIND_PORT",
+            "api_key": "API_KEY"
+        }
+        
+        for key, env_key in config_mapping.items():
+            if key in config_data:
+                env_vars[env_key] = str(config_data[key])
+        
+        # Write updated .env file
+        with open(env_file, 'w') as f:
+            for key, value in env_vars.items():
+                f.write(f"{key}={value}\n")
+        
+        logging.info("Configuration updated successfully")
+        return jsonify({"status": "success", "message": "Configuration updated successfully"})
+        
+    except Exception as e:
+        logging.error(f"Error updating configuration: {e}")
+        return jsonify({"status": "error", "message": f"Error updating configuration: {str(e)}"}), 500
+
 # --- Block/Unblock ---
 @app.route("/block_user", methods=["GET"])
 @require_api_key

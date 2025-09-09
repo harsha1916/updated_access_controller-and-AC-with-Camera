@@ -1,80 +1,78 @@
-# RFID Access Control System - Web Interface
+# RFID Access Control System - Complete Web Interface
 
 ## Overview
 
-The web interface provides a comprehensive dashboard for monitoring RFID access control activities, including scanned tags and captured images.
+The web interface provides a comprehensive management system for RFID access control, including user management, configuration, monitoring, and image management.
 
 ## Features
 
-### 📊 Dashboard Statistics
-- **Total Scans**: Count of all RFID card scans
-- **Access Granted**: Number of successful access attempts
-- **Access Denied**: Number of denied access attempts
-- **Images Captured**: Total number of images stored locally
+### 🎛️ **Three Main Tabs:**
 
-### 📱 Recent Scans Display
-- Real-time display of the latest 10 RFID scans
-- Color-coded status indicators:
-  - 🟢 **Green**: Access Granted
-  - 🔴 **Red**: Access Denied
-  - 🟡 **Yellow**: Blocked User
-- Shows card number, user name, reader ID, and timestamp
-- Auto-refreshes every 5 seconds
+#### 1. **📊 Dashboard Tab**
+- **Statistics Cards**: Total scans, granted/denied counts, image counts
+- **Recent Scans Display**: Real-time RFID transaction history
+- **Image Gallery**: Browse captured images with upload status
+- **Auto-refresh**: Updates every 5 seconds
 
-### 📸 Image Gallery
-- Displays up to **100 most recent images** (bucket limit for viewing)
-- Shows all locally stored images with upload status:
+#### 2. **👥 User Management Tab**
+- **Add Users**: Complete form with card number, user ID, name, reference ID
+- **Delete Users**: Remove users by card number
+- **Block/Unblock Users**: Manage user access permissions
+- **Search Users**: Find users by ID
+- **User List**: View all users with quick action buttons
+
+#### 3. **⚙️ Configuration Tab**
+- **Camera Configuration**: Set RTSP URLs, IP addresses, credentials
+- **S3 Configuration**: Configure upload endpoints and retry settings
+- **System Configuration**: Server settings, API keys, ports
+- **Real-time RTSP URL Generation**: Auto-updates when camera settings change
+
+### 📸 **Image Management**
+- **Display Limit**: 100 most recent images (bucket limit for viewing)
+- **Unlimited Storage**: All images stored locally
+- **Upload Status Tracking**:
   - ✅ **Uploaded**: Successfully uploaded to S3
   - ⏳ **Pending**: Waiting to be uploaded
   - ❌ **Failed**: Upload failed (will retry)
-- Click on any image to view full-size in modal
-- Image details include:
-  - Card number
-  - Capture timestamp
-  - Upload status
-  - S3 location (if uploaded)
+- **Interactive Features**:
+  - Click images to view full-size in modal
+  - Download images directly from modal
+  - Delete images with confirmation
+- **Image Details**: Card number, timestamp, upload status, S3 location
 
-### 🔄 Real-time Updates
+### 🔄 **Real-time Features**
 - Auto-refresh every 5 seconds
 - Manual refresh button (floating action button)
 - Connection status indicator
 - Offline/online detection
+- Live notifications for all actions
 
 ## API Endpoints
 
-### GET `/`
-- **Description**: Main dashboard interface
-- **Response**: HTML page with full interface
+### **Dashboard & Monitoring**
+- `GET /` - Main web interface with tabs
+- `GET /get_transactions` - Recent RFID transactions (10 latest)
+- `GET /get_images` - Image list with upload status (100 limit for display)
+- `GET /image/<filename>` - Serve image files
+- `GET /status` - System status and health check
 
-### GET `/get_transactions`
-- **Description**: Fetch recent RFID transactions
-- **Response**: JSON array of transaction objects
-- **Limit**: 10 most recent transactions
+### **User Management**
+- `GET /add_user` - Add new user (requires API key)
+- `GET /delete_user` - Delete user (requires API key)
+- `GET /block_user` - Block user access (requires API key)
+- `GET /unblock_user` - Unblock user access (requires API key)
+- `GET /search_user` - Search user by ID
+- `GET /get_users` - Get all users list
 
-### GET `/get_images`
-- **Description**: Get list of captured images with upload status
-- **Response**: JSON object with:
-  ```json
-  {
-    "images": [...],           // Array of image objects (max 100)
-    "total": 150,              // Total images stored
-    "uploaded": 120,           // Successfully uploaded
-    "pending": 25,             // Pending upload
-    "failed": 5,               // Failed uploads
-    "display_limit": 100       // Display limit
-  }
-  ```
+### **Configuration Management**
+- `GET /get_config` - Get current system configuration
+- `POST /update_config` - Update configuration (requires API key)
 
-### GET `/image/<filename>`
-- **Description**: Serve image files
-- **Parameters**: `filename` - Image filename (jpg/jpeg only)
-- **Response**: Image file or error
+### **Image Management**
+- `DELETE /delete_image/<filename>` - Delete image (requires API key)
 
-### DELETE `/delete_image/<filename>`
-- **Description**: Delete image and its upload metadata
-- **Parameters**: `filename` - Image filename
-- **Authentication**: Requires API key
-- **Response**: JSON status response
+### **System Control**
+- `GET /relay` - Control door relays (requires API key)
 
 ## Image Storage Details
 

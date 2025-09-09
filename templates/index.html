@@ -80,9 +80,34 @@
         </div>
     </nav>
 
-    <div class="container-fluid mt-3">
-        <!-- Statistics Cards -->
-        <div class="row mb-4">
+    <!-- Navigation Tabs -->
+    <div class="container-fluid">
+        <ul class="nav nav-tabs mt-3" id="mainTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="dashboard-tab" data-bs-toggle="tab" data-bs-target="#dashboard" type="button" role="tab">
+                    <i class="fas fa-tachometer-alt"></i> Dashboard
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="users-tab" data-bs-toggle="tab" data-bs-target="#users" type="button" role="tab">
+                    <i class="fas fa-users"></i> User Management
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="config-tab" data-bs-toggle="tab" data-bs-target="#config" type="button" role="tab">
+                    <i class="fas fa-cog"></i> Configuration
+                </button>
+            </li>
+        </ul>
+    </div>
+
+    <!-- Tab Content -->
+    <div class="tab-content" id="mainTabsContent">
+        <!-- Dashboard Tab -->
+        <div class="tab-pane fade show active" id="dashboard" role="tabpanel">
+            <div class="container-fluid mt-3">
+                <!-- Statistics Cards -->
+                <div class="row mb-4">
             <div class="col-md-3">
                 <div class="card stats-card">
                     <div class="card-body text-center">
@@ -155,8 +180,243 @@
                     </div>
                 </div>
             </div>
+            </div>
         </div>
     </div>
+
+    <!-- User Management Tab -->
+    <div class="tab-pane fade" id="users" role="tabpanel">
+        <div class="container-fluid mt-3">
+            <div class="row">
+                <!-- Add User Form -->
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0"><i class="fas fa-user-plus"></i> Add User</h5>
+                        </div>
+                        <div class="card-body">
+                            <form id="addUserForm">
+                                <div class="mb-3">
+                                    <label for="addCardNumber" class="form-label">Card Number</label>
+                                    <input type="text" class="form-control" id="addCardNumber" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="addUserId" class="form-label">User ID</label>
+                                    <input type="text" class="form-control" id="addUserId" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="addUserName" class="form-label">Name</label>
+                                    <input type="text" class="form-control" id="addUserName" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="addRefId" class="form-label">Reference ID (Optional)</label>
+                                    <input type="text" class="form-control" id="addRefId">
+                                </div>
+                                <button type="submit" class="btn btn-success">
+                                    <i class="fas fa-plus"></i> Add User
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- User Actions -->
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0"><i class="fas fa-user-cog"></i> User Actions</h5>
+                        </div>
+                        <div class="card-body">
+                            <!-- Delete User -->
+                            <div class="mb-4">
+                                <h6><i class="fas fa-user-minus"></i> Delete User</h6>
+                                <form id="deleteUserForm">
+                                    <div class="input-group">
+                                        <input type="text" class="form-control" id="deleteCardNumber" placeholder="Card Number" required>
+                                        <button type="submit" class="btn btn-danger">
+                                            <i class="fas fa-trash"></i> Delete
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+
+                            <!-- Block User -->
+                            <div class="mb-4">
+                                <h6><i class="fas fa-ban"></i> Block User</h6>
+                                <form id="blockUserForm">
+                                    <div class="input-group">
+                                        <input type="text" class="form-control" id="blockCardNumber" placeholder="Card Number" required>
+                                        <button type="submit" class="btn btn-warning">
+                                            <i class="fas fa-ban"></i> Block
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+
+                            <!-- Unblock User -->
+                            <div class="mb-4">
+                                <h6><i class="fas fa-check-circle"></i> Unblock User</h6>
+                                <form id="unblockUserForm">
+                                    <div class="input-group">
+                                        <input type="text" class="form-control" id="unblockCardNumber" placeholder="Card Number" required>
+                                        <button type="submit" class="btn btn-success">
+                                            <i class="fas fa-check"></i> Unblock
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+
+                            <!-- Search User -->
+                            <div class="mb-4">
+                                <h6><i class="fas fa-search"></i> Search User</h6>
+                                <form id="searchUserForm">
+                                    <div class="input-group">
+                                        <input type="text" class="form-control" id="searchUserId" placeholder="User ID" required>
+                                        <button type="submit" class="btn btn-info">
+                                            <i class="fas fa-search"></i> Search
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- User List -->
+            <div class="row mt-4">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0"><i class="fas fa-list"></i> User List</h5>
+                            <button class="btn btn-sm btn-outline-primary" onclick="loadUserList()">
+                                <i class="fas fa-refresh"></i> Refresh
+                            </button>
+                        </div>
+                        <div class="card-body">
+                            <div id="userListContainer">
+                                <div class="text-center text-muted">
+                                    <i class="fas fa-spinner fa-spin"></i> Loading users...
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Configuration Tab -->
+    <div class="tab-pane fade" id="config" role="tabpanel">
+        <div class="container-fluid mt-3">
+            <div class="row">
+                <!-- Camera Configuration -->
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0"><i class="fas fa-video"></i> Camera Configuration</h5>
+                        </div>
+                        <div class="card-body">
+                            <form id="cameraConfigForm">
+                                <div class="mb-3">
+                                    <label for="cameraUsername" class="form-label">Camera Username</label>
+                                    <input type="text" class="form-control" id="cameraUsername" placeholder="admin">
+                                </div>
+                                <div class="mb-3">
+                                    <label for="cameraPassword" class="form-label">Camera Password</label>
+                                    <input type="password" class="form-control" id="cameraPassword" placeholder="admin">
+                                </div>
+                                <div class="mb-3">
+                                    <label for="camera1Ip" class="form-label">Camera 1 IP Address</label>
+                                    <input type="text" class="form-control" id="camera1Ip" placeholder="192.168.1.201">
+                                </div>
+                                <div class="mb-3">
+                                    <label for="camera2Ip" class="form-label">Camera 2 IP Address</label>
+                                    <input type="text" class="form-control" id="camera2Ip" placeholder="192.168.1.202">
+                                </div>
+                                <div class="mb-3">
+                                    <label for="camera1Rtsp" class="form-label">Camera 1 RTSP URL</label>
+                                    <input type="text" class="form-control" id="camera1Rtsp" readonly>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="camera2Rtsp" class="form-label">Camera 2 RTSP URL</label>
+                                    <input type="text" class="form-control" id="camera2Rtsp" readonly>
+                                </div>
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-save"></i> Update Camera Config
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- S3 Configuration -->
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0"><i class="fas fa-cloud-upload-alt"></i> S3 Configuration</h5>
+                        </div>
+                        <div class="card-body">
+                            <form id="s3ConfigForm">
+                                <div class="mb-3">
+                                    <label for="s3ApiUrl" class="form-label">S3 API URL</label>
+                                    <input type="url" class="form-control" id="s3ApiUrl" placeholder="https://api.easyparkai.com/api/Common/Upload?modulename=anpr">
+                                </div>
+                                <div class="mb-3">
+                                    <label for="maxRetries" class="form-label">Max Retries</label>
+                                    <input type="number" class="form-control" id="maxRetries" min="1" max="10" value="5">
+                                </div>
+                                <div class="mb-3">
+                                    <label for="retryDelay" class="form-label">Retry Delay (seconds)</label>
+                                    <input type="number" class="form-control" id="retryDelay" min="1" max="60" value="5">
+                                </div>
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-save"></i> Update S3 Config
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- System Configuration -->
+            <div class="row mt-4">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0"><i class="fas fa-server"></i> System Configuration</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        <label for="bindIp" class="form-label">Bind IP</label>
+                                        <input type="text" class="form-control" id="bindIp" placeholder="192.168.1.33">
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        <label for="bindPort" class="form-label">Bind Port</label>
+                                        <input type="number" class="form-control" id="bindPort" min="1000" max="65535" value="9000">
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        <label for="apiKey" class="form-label">API Key</label>
+                                        <input type="text" class="form-control" id="apiKey" placeholder="your-api-key-change-this">
+                                    </div>
+                                </div>
+                            </div>
+                            <button type="button" class="btn btn-success" onclick="saveSystemConfig()">
+                                <i class="fas fa-save"></i> Save System Configuration
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 
     <!-- Floating Refresh Button -->
     <button class="btn btn-primary btn-lg rounded-circle refresh-btn" onclick="refreshData()" title="Refresh Data">
@@ -195,6 +455,12 @@
             refreshData();
             // Auto-refresh every 5 seconds
             refreshInterval = setInterval(refreshData, 5000);
+            
+            // Initialize form handlers
+            initializeFormHandlers();
+            
+            // Load configuration
+            loadConfiguration();
         });
 
         // Cleanup on page unload
@@ -413,6 +679,378 @@
             } else {
                 return 'fas fa-clock';
             }
+        }
+
+        // =========================
+        // Form Handlers
+        // =========================
+        function initializeFormHandlers() {
+            // Add User Form
+            document.getElementById('addUserForm').addEventListener('submit', async function(e) {
+                e.preventDefault();
+                await addUser();
+            });
+
+            // Delete User Form
+            document.getElementById('deleteUserForm').addEventListener('submit', async function(e) {
+                e.preventDefault();
+                await deleteUser();
+            });
+
+            // Block User Form
+            document.getElementById('blockUserForm').addEventListener('submit', async function(e) {
+                e.preventDefault();
+                await blockUser();
+            });
+
+            // Unblock User Form
+            document.getElementById('unblockUserForm').addEventListener('submit', async function(e) {
+                e.preventDefault();
+                await unblockUser();
+            });
+
+            // Search User Form
+            document.getElementById('searchUserForm').addEventListener('submit', async function(e) {
+                e.preventDefault();
+                await searchUser();
+            });
+
+            // Camera Config Form
+            document.getElementById('cameraConfigForm').addEventListener('submit', async function(e) {
+                e.preventDefault();
+                await updateCameraConfig();
+            });
+
+            // S3 Config Form
+            document.getElementById('s3ConfigForm').addEventListener('submit', async function(e) {
+                e.preventDefault();
+                await updateS3Config();
+            });
+
+            // Auto-update RTSP URLs when camera settings change
+            document.getElementById('cameraUsername').addEventListener('input', updateRtspUrls);
+            document.getElementById('cameraPassword').addEventListener('input', updateRtspUrls);
+            document.getElementById('camera1Ip').addEventListener('input', updateRtspUrls);
+            document.getElementById('camera2Ip').addEventListener('input', updateRtspUrls);
+        }
+
+        // =========================
+        // User Management Functions
+        // =========================
+        async function addUser() {
+            const cardNumber = document.getElementById('addCardNumber').value;
+            const userId = document.getElementById('addUserId').value;
+            const name = document.getElementById('addUserName').value;
+            const refId = document.getElementById('addRefId').value;
+
+            try {
+                const params = new URLSearchParams({
+                    api_key: getApiKey(),
+                    card_number: cardNumber,
+                    id: userId,
+                    name: name,
+                    ref_id: refId
+                });
+
+                const response = await fetch(`/add_user?${params}`);
+                const result = await response.json();
+
+                if (result.status === 'success') {
+                    showNotification('User added successfully!', 'success');
+                    document.getElementById('addUserForm').reset();
+                    loadUserList();
+                } else {
+                    showNotification(`Error: ${result.message}`, 'danger');
+                }
+            } catch (error) {
+                showNotification(`Error adding user: ${error.message}`, 'danger');
+            }
+        }
+
+        async function deleteUser() {
+            const cardNumber = document.getElementById('deleteCardNumber').value;
+
+            try {
+                const params = new URLSearchParams({
+                    api_key: getApiKey(),
+                    card_number: cardNumber
+                });
+
+                const response = await fetch(`/delete_user?${params}`);
+                const result = await response.json();
+
+                if (result.status === 'success') {
+                    showNotification('User deleted successfully!', 'success');
+                    document.getElementById('deleteUserForm').reset();
+                    loadUserList();
+                } else {
+                    showNotification(`Error: ${result.message}`, 'danger');
+                }
+            } catch (error) {
+                showNotification(`Error deleting user: ${error.message}`, 'danger');
+            }
+        }
+
+        async function blockUser() {
+            const cardNumber = document.getElementById('blockCardNumber').value;
+
+            try {
+                const params = new URLSearchParams({
+                    api_key: getApiKey(),
+                    card_number: cardNumber
+                });
+
+                const response = await fetch(`/block_user?${params}`);
+                const result = await response.json();
+
+                if (result.status === 'success') {
+                    showNotification('User blocked successfully!', 'success');
+                    document.getElementById('blockUserForm').reset();
+                    loadUserList();
+                } else {
+                    showNotification(`Error: ${result.message}`, 'danger');
+                }
+            } catch (error) {
+                showNotification(`Error blocking user: ${error.message}`, 'danger');
+            }
+        }
+
+        async function unblockUser() {
+            const cardNumber = document.getElementById('unblockCardNumber').value;
+
+            try {
+                const params = new URLSearchParams({
+                    api_key: getApiKey(),
+                    card_number: cardNumber
+                });
+
+                const response = await fetch(`/unblock_user?${params}`);
+                const result = await response.json();
+
+                if (result.status === 'success') {
+                    showNotification('User unblocked successfully!', 'success');
+                    document.getElementById('unblockUserForm').reset();
+                    loadUserList();
+                } else {
+                    showNotification(`Error: ${result.message}`, 'danger');
+                }
+            } catch (error) {
+                showNotification(`Error unblocking user: ${error.message}`, 'danger');
+            }
+        }
+
+        async function searchUser() {
+            const userId = document.getElementById('searchUserId').value;
+
+            try {
+                const params = new URLSearchParams({
+                    id: userId
+                });
+
+                const response = await fetch(`/search_user?${params}`);
+                const result = await response.json();
+
+                if (result.status === 'success' && result.users.length > 0) {
+                    const user = result.users[0];
+                    showNotification(`Found user: ${user.name} (Card: ${user.card_number})`, 'success');
+                } else {
+                    showNotification('User not found', 'warning');
+                }
+            } catch (error) {
+                showNotification(`Error searching user: ${error.message}`, 'danger');
+            }
+        }
+
+        async function loadUserList() {
+            try {
+                const response = await fetch('/get_users');
+                const users = await response.json();
+                
+                const container = document.getElementById('userListContainer');
+                
+                if (users.length === 0) {
+                    container.innerHTML = '<div class="text-center text-muted">No users found</div>';
+                    return;
+                }
+
+                const usersHtml = users.map(user => `
+                    <div class="card mb-2">
+                        <div class="card-body py-2">
+                            <div class="row align-items-center">
+                                <div class="col-md-3">
+                                    <strong>${user.name}</strong>
+                                </div>
+                                <div class="col-md-2">
+                                    <small class="text-muted">Card: ${user.card_number}</small>
+                                </div>
+                                <div class="col-md-2">
+                                    <small class="text-muted">ID: ${user.id}</small>
+                                </div>
+                                <div class="col-md-2">
+                                    <small class="text-muted">Ref: ${user.ref_id || 'N/A'}</small>
+                                </div>
+                                <div class="col-md-3 text-end">
+                                    <button class="btn btn-sm btn-outline-danger" onclick="deleteUserByCard('${user.card_number}')">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-warning" onclick="blockUserByCard('${user.card_number}')">
+                                        <i class="fas fa-ban"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+
+                container.innerHTML = usersHtml;
+            } catch (error) {
+                document.getElementById('userListContainer').innerHTML = 
+                    '<div class="text-center text-danger">Error loading users</div>';
+            }
+        }
+
+        async function deleteUserByCard(cardNumber) {
+            if (confirm(`Are you sure you want to delete user with card ${cardNumber}?`)) {
+                document.getElementById('deleteCardNumber').value = cardNumber;
+                await deleteUser();
+            }
+        }
+
+        async function blockUserByCard(cardNumber) {
+            if (confirm(`Are you sure you want to block user with card ${cardNumber}?`)) {
+                document.getElementById('blockCardNumber').value = cardNumber;
+                await blockUser();
+            }
+        }
+
+        // =========================
+        // Configuration Functions
+        // =========================
+        async function loadConfiguration() {
+            try {
+                const response = await fetch('/get_config');
+                const config = await response.json();
+                
+                // Load camera configuration
+                document.getElementById('cameraUsername').value = config.camera_username || '';
+                document.getElementById('cameraPassword').value = config.camera_password || '';
+                document.getElementById('camera1Ip').value = config.camera_1_ip || '';
+                document.getElementById('camera2Ip').value = config.camera_2_ip || '';
+                
+                // Load S3 configuration
+                document.getElementById('s3ApiUrl').value = config.s3_api_url || '';
+                document.getElementById('maxRetries').value = config.max_retries || 5;
+                document.getElementById('retryDelay').value = config.retry_delay || 5;
+                
+                // Load system configuration
+                document.getElementById('bindIp').value = config.bind_ip || '';
+                document.getElementById('bindPort').value = config.bind_port || 9000;
+                document.getElementById('apiKey').value = config.api_key || '';
+                
+                // Update RTSP URLs
+                updateRtspUrls();
+            } catch (error) {
+                console.error('Error loading configuration:', error);
+            }
+        }
+
+        function updateRtspUrls() {
+            const username = document.getElementById('cameraUsername').value || 'admin';
+            const password = document.getElementById('cameraPassword').value || 'admin';
+            const ip1 = document.getElementById('camera1Ip').value || '192.168.1.201';
+            const ip2 = document.getElementById('camera2Ip').value || '192.168.1.202';
+            
+            const rtsp1 = `rtsp://${username}:${password}@${ip1}:554/avstream/channel=1/stream=0.sdp`;
+            const rtsp2 = `rtsp://${username}:${password}@${ip2}:554/avstream/channel=1/stream=0.sdp`;
+            
+            document.getElementById('camera1Rtsp').value = rtsp1;
+            document.getElementById('camera2Rtsp').value = rtsp2;
+        }
+
+        async function updateCameraConfig() {
+            const config = {
+                camera_username: document.getElementById('cameraUsername').value,
+                camera_password: document.getElementById('cameraPassword').value,
+                camera_1_ip: document.getElementById('camera1Ip').value,
+                camera_2_ip: document.getElementById('camera2Ip').value
+            };
+
+            try {
+                const response = await fetch('/update_config', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(config)
+                });
+
+                const result = await response.json();
+                if (result.status === 'success') {
+                    showNotification('Camera configuration updated!', 'success');
+                } else {
+                    showNotification(`Error: ${result.message}`, 'danger');
+                }
+            } catch (error) {
+                showNotification(`Error updating camera config: ${error.message}`, 'danger');
+            }
+        }
+
+        async function updateS3Config() {
+            const config = {
+                s3_api_url: document.getElementById('s3ApiUrl').value,
+                max_retries: parseInt(document.getElementById('maxRetries').value),
+                retry_delay: parseInt(document.getElementById('retryDelay').value)
+            };
+
+            try {
+                const response = await fetch('/update_config', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(config)
+                });
+
+                const result = await response.json();
+                if (result.status === 'success') {
+                    showNotification('S3 configuration updated!', 'success');
+                } else {
+                    showNotification(`Error: ${result.message}`, 'danger');
+                }
+            } catch (error) {
+                showNotification(`Error updating S3 config: ${error.message}`, 'danger');
+            }
+        }
+
+        async function saveSystemConfig() {
+            const config = {
+                bind_ip: document.getElementById('bindIp').value,
+                bind_port: parseInt(document.getElementById('bindPort').value),
+                api_key: document.getElementById('apiKey').value
+            };
+
+            try {
+                const response = await fetch('/update_config', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(config)
+                });
+
+                const result = await response.json();
+                if (result.status === 'success') {
+                    showNotification('System configuration updated! Restart required.', 'success');
+                } else {
+                    showNotification(`Error: ${result.message}`, 'danger');
+                }
+            } catch (error) {
+                showNotification(`Error updating system config: ${error.message}`, 'danger');
+            }
+        }
+
+        function getApiKey() {
+            return document.getElementById('apiKey').value || 'your-api-key-change-this';
         }
     </script>
 </body>
