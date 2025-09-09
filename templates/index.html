@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RFID Access Control System</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .status-granted { color: #28a745; }
+        .status-denied { color: #dc3545; }
+        .status-blocked { color: #ffc107; }
+        .upload-status-uploaded { color: #28a745; }
+        .upload-status-pending { color: #ffc107; }
+        .upload-status-failed { color: #dc3545; }
+        .image-thumbnail {
+            width: 100px;
+            height: 75px;
+            object-fit: cover;
+            border-radius: 4px;
+        }
+        .scan-card {
+            border-left: 4px solid #007bff;
+            margin-bottom: 10px;
+        }
+        .scan-card.granted { border-left-color: #28a745; }
+        .scan-card.denied { border-left-color: #dc3545; }
+        .scan-card.blocked { border-left-color: #ffc107; }
+        .refresh-btn {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 1000;
+        }
+        .stats-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .image-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        .image-item {
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 10px;
+            background: white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .image-item img {
+            width: 100%;
+            height: 150px;
+            object-fit: cover;
+            border-radius: 4px;
+        }
+        .upload-badge {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-dark bg-dark">
+        <div class="container-fluid">
+            <span class="navbar-brand mb-0 h1">
+                <i class="fas fa-id-card"></i> RFID Access Control System
+            </span>
+            <div class="d-flex">
+                <span class="navbar-text me-3">
+                    <i class="fas fa-circle text-success" id="status-indicator"></i>
+                    <span id="connection-status">Online</span>
+                </span>
+                <button class="btn btn-outline-light btn-sm" onclick="refreshData()">
+                    <i class="fas fa-sync-alt"></i> Refresh
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid mt-3">
+        <!-- Statistics Cards -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="card stats-card">
+                    <div class="card-body text-center">
+                        <h5 class="card-title"><i class="fas fa-users"></i> Total Scans</h5>
+                        <h3 id="total-scans">0</h3>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stats-card">
+                    <div class="card-body text-center">
+                        <h5 class="card-title"><i class="fas fa-check-circle"></i> Granted</h5>
+                        <h3 id="granted-scans">0</h3>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stats-card">
+                    <div class="card-body text-center">
+                        <h5 class="card-title"><i class="fas fa-times-circle"></i> Denied</h5>
+                        <h3 id="denied-scans">0</h3>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stats-card">
+                    <div class="card-body text-center">
+                        <h5 class="card-title"><i class="fas fa-images"></i> Images</h5>
+                        <h3 id="total-images">0</h3>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <!-- Recent Scans -->
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="fas fa-history"></i> Recent Scans</h5>
+                        <span class="badge bg-primary" id="scans-count">0</span>
+                    </div>
+                    <div class="card-body" style="max-height: 600px; overflow-y: auto;">
+                        <div id="scans-container">
+                            <div class="text-center text-muted">
+                                <i class="fas fa-spinner fa-spin"></i> Loading scans...
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Image Gallery -->
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="fas fa-camera"></i> Captured Images</h5>
+                        <div>
+                            <span class="badge bg-success me-2" id="uploaded-count">0</span>
+                            <span class="badge bg-warning me-2" id="pending-count">0</span>
+                            <span class="badge bg-danger" id="failed-count">0</span>
+                        </div>
+                    </div>
+                    <div class="card-body" style="max-height: 600px; overflow-y: auto;">
+                        <div id="images-container">
+                            <div class="text-center text-muted">
+                                <i class="fas fa-spinner fa-spin"></i> Loading images...
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Floating Refresh Button -->
+    <button class="btn btn-primary btn-lg rounded-circle refresh-btn" onclick="refreshData()" title="Refresh Data">
+        <i class="fas fa-sync-alt"></i>
+    </button>
+
+    <!-- Image Modal -->
+    <div class="modal fade" id="imageModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="imageModalTitle">Image Details</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body text-center">
+                    <img id="modalImage" src="" class="img-fluid" style="max-height: 500px;">
+                    <div class="mt-3">
+                        <p><strong>File:</strong> <span id="modalFileName"></span></p>
+                        <p><strong>Card:</strong> <span id="modalCardNumber"></span></p>
+                        <p><strong>Timestamp:</strong> <span id="modalTimestamp"></span></p>
+                        <p><strong>Upload Status:</strong> <span id="modalUploadStatus"></span></p>
+                        <p><strong>S3 Location:</strong> <span id="modalS3Location"></span></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let refreshInterval;
+        let isRefreshing = false;
+
+        // Initialize the interface
+        document.addEventListener('DOMContentLoaded', function() {
+            refreshData();
+            // Auto-refresh every 5 seconds
+            refreshInterval = setInterval(refreshData, 5000);
+        });
+
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', function() {
+            if (refreshInterval) {
+                clearInterval(refreshInterval);
+            }
+        });
+
+        async function refreshData() {
+            if (isRefreshing) return;
+            isRefreshing = true;
+
+            try {
+                // Update connection status
+                updateConnectionStatus();
+                
+                // Fetch and display scans
+                await fetchAndDisplayScans();
+                
+                // Fetch and display images
+                await fetchAndDisplayImages();
+                
+            } catch (error) {
+                console.error('Error refreshing data:', error);
+                updateConnectionStatus(false);
+            } finally {
+                isRefreshing = false;
+            }
+        }
+
+        async function updateConnectionStatus(online = true) {
+            const indicator = document.getElementById('status-indicator');
+            const status = document.getElementById('connection-status');
+            
+            if (online) {
+                indicator.className = 'fas fa-circle text-success';
+                status.textContent = 'Online';
+            } else {
+                indicator.className = 'fas fa-circle text-danger';
+                status.textContent = 'Offline';
+            }
+        }
+
+        async function fetchAndDisplayScans() {
+            try {
+                const response = await fetch('/get_transactions');
+                const scans = await response.json();
+                
+                displayScans(scans);
+                updateScanStats(scans);
+                
+            } catch (error) {
+                console.error('Error fetching scans:', error);
+                document.getElementById('scans-container').innerHTML = 
+                    '<div class="text-center text-danger"><i class="fas fa-exclamation-triangle"></i> Error loading scans</div>';
+            }
+        }
+
+        function displayScans(scans) {
+            const container = document.getElementById('scans-container');
+            const count = document.getElementById('scans-count');
+            
+            count.textContent = scans.length;
+            
+            if (scans.length === 0) {
+                container.innerHTML = '<div class="text-center text-muted">No recent scans</div>';
+                return;
+            }
+
+            const scansHtml = scans.map(scan => {
+                const statusClass = scan.status.toLowerCase().replace(' ', '-');
+                const statusIcon = getStatusIcon(scan.status);
+                const timestamp = new Date(scan.timestamp * 1000).toLocaleString();
+                
+                return `
+                    <div class="card scan-card ${statusClass} mb-2">
+                        <div class="card-body py-2">
+                            <div class="row align-items-center">
+                                <div class="col-md-2">
+                                    <i class="${statusIcon} fa-2x"></i>
+                                </div>
+                                <div class="col-md-6">
+                                    <h6 class="mb-1">${scan.name}</h6>
+                                    <small class="text-muted">Card: ${scan.card_number}</small><br>
+                                    <small class="text-muted">Reader: ${scan.reader}</small>
+                                </div>
+                                <div class="col-md-4 text-end">
+                                    <span class="badge bg-${getStatusColor(scan.status)}">${scan.status}</span><br>
+                                    <small class="text-muted">${timestamp}</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            container.innerHTML = scansHtml;
+        }
+
+        function updateScanStats(scans) {
+            const total = scans.length;
+            const granted = scans.filter(s => s.status === 'Access Granted').length;
+            const denied = scans.filter(s => s.status === 'Access Denied').length;
+            
+            document.getElementById('total-scans').textContent = total;
+            document.getElementById('granted-scans').textContent = granted;
+            document.getElementById('denied-scans').textContent = denied;
+        }
+
+        async function fetchAndDisplayImages() {
+            try {
+                const response = await fetch('/get_images');
+                const data = await response.json();
+                
+                displayImages(data.images);
+                updateImageStats(data);
+                
+            } catch (error) {
+                console.error('Error fetching images:', error);
+                document.getElementById('images-container').innerHTML = 
+                    '<div class="text-center text-danger"><i class="fas fa-exclamation-triangle"></i> Error loading images</div>';
+            }
+        }
+
+        function displayImages(images) {
+            const container = document.getElementById('images-container');
+            
+            if (images.length === 0) {
+                container.innerHTML = '<div class="text-center text-muted">No images captured</div>';
+                return;
+            }
+
+            const imagesHtml = images.map(image => {
+                const uploadStatus = getUploadStatus(image.uploaded);
+                const uploadIcon = getUploadIcon(image.uploaded);
+                const timestamp = new Date(image.timestamp * 1000).toLocaleString();
+                
+                return `
+                    <div class="image-item position-relative">
+                        <img src="/image/${image.filename}" alt="${image.filename}" 
+                             onclick="showImageModal('${image.filename}', '${image.card_number}', ${image.timestamp}, '${image.uploaded}', '${image.s3_location || ''}')"
+                             style="cursor: pointer;">
+                        <div class="upload-badge">
+                            <span class="badge bg-${uploadStatus.color}" title="${uploadStatus.text}">
+                                <i class="${uploadIcon}"></i>
+                            </span>
+                        </div>
+                        <div class="mt-2">
+                            <small class="text-muted d-block">Card: ${image.card_number}</small>
+                            <small class="text-muted d-block">${timestamp}</small>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            container.innerHTML = `<div class="image-grid">${imagesHtml}</div>`;
+        }
+
+        function updateImageStats(data) {
+            document.getElementById('total-images').textContent = data.total;
+            document.getElementById('uploaded-count').textContent = data.uploaded;
+            document.getElementById('pending-count').textContent = data.pending;
+            document.getElementById('failed-count').textContent = data.failed;
+        }
+
+        function showImageModal(filename, cardNumber, timestamp, uploaded, s3Location) {
+            document.getElementById('modalImage').src = `/image/${filename}`;
+            document.getElementById('modalFileName').textContent = filename;
+            document.getElementById('modalCardNumber').textContent = cardNumber;
+            document.getElementById('modalTimestamp').textContent = new Date(timestamp * 1000).toLocaleString();
+            
+            const uploadStatus = getUploadStatus(uploaded);
+            document.getElementById('modalUploadStatus').innerHTML = 
+                `<span class="badge bg-${uploadStatus.color}">${uploadStatus.text}</span>`;
+            
+            document.getElementById('modalS3Location').textContent = s3Location || 'Not uploaded';
+            
+            const modal = new bootstrap.Modal(document.getElementById('imageModal'));
+            modal.show();
+        }
+
+        function getStatusIcon(status) {
+            switch(status) {
+                case 'Access Granted': return 'fas fa-check-circle text-success';
+                case 'Access Denied': return 'fas fa-times-circle text-danger';
+                case 'Blocked': return 'fas fa-ban text-warning';
+                default: return 'fas fa-question-circle text-secondary';
+            }
+        }
+
+        function getStatusColor(status) {
+            switch(status) {
+                case 'Access Granted': return 'success';
+                case 'Access Denied': return 'danger';
+                case 'Blocked': return 'warning';
+                default: return 'secondary';
+            }
+        }
+
+        function getUploadStatus(uploaded) {
+            if (uploaded === true) {
+                return { color: 'success', text: 'Uploaded' };
+            } else if (uploaded === false) {
+                return { color: 'danger', text: 'Failed' };
+            } else {
+                return { color: 'warning', text: 'Pending' };
+            }
+        }
+
+        function getUploadIcon(uploaded) {
+            if (uploaded === true) {
+                return 'fas fa-check';
+            } else if (uploaded === false) {
+                return 'fas fa-times';
+            } else {
+                return 'fas fa-clock';
+            }
+        }
+    </script>
+</body>
+</html>
