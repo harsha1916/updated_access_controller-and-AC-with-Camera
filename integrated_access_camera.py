@@ -1151,6 +1151,33 @@ def serve_image(filename):
         logging.error(f"Error serving image {filename}: {e}")
         return "Error serving image", 500
 
+@app.route("/static/<filename>")
+def serve_static(filename):
+    """Serve static files from templates directory (for company images)."""
+    try:
+        # Security check - only allow specific image files
+        allowed_extensions = ['.png', '.jpg', '.jpeg', '.gif', '.svg']
+        if not any(filename.lower().endswith(ext) for ext in allowed_extensions):
+            return "Invalid file type", 400
+        
+        # Prevent directory traversal
+        if '..' in filename or '/' in filename or '\\' in filename:
+            return "Invalid filename", 400
+        
+        # Serve from templates directory for company images
+        templates_dir = os.path.join(os.path.dirname(__file__), "templates")
+        filepath = os.path.join(templates_dir, filename)
+        
+        if not os.path.exists(filepath):
+            return "File not found", 404
+        
+        from flask import send_file
+        return send_file(filepath)
+        
+    except Exception as e:
+        logging.error(f"Error serving static file {filename}: {e}")
+        return "Error serving file", 500
+
 @app.route("/delete_image/<filename>", methods=["DELETE"])
 @require_api_key
 def delete_image(filename):
