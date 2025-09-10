@@ -530,6 +530,14 @@ def capture_for_reader_async(reader_id: int, card_int: int):
     Later upload happens from a background worker that scans the images directory.
     """
     try:
+        # Check if camera is enabled for this reader
+        camera_enabled_key = "camera_1_enabled" if reader_id == 1 else "camera_2_enabled"
+        camera_enabled = os.getenv(camera_enabled_key, "true").lower() == "true"
+        
+        if not camera_enabled:
+            logging.info(f"Camera {reader_id} is disabled, skipping image capture for card {card_int}")
+            return
+
         card_str = str(card_int)
         safe = _sanitize_card_number(card_str)
         ts = int(time.time())
@@ -1077,6 +1085,8 @@ def get_config():
             "camera_password": os.getenv("CAMERA_PASSWORD", "admin"),
             "camera_1_ip": os.getenv("CAMERA_1_IP", "192.168.1.201"),
             "camera_2_ip": os.getenv("CAMERA_2_IP", "192.168.1.202"),
+            "camera_1_enabled": os.getenv("CAMERA_1_ENABLED", "true").lower() == "true",
+            "camera_2_enabled": os.getenv("CAMERA_2_ENABLED", "true").lower() == "true",
             "s3_api_url": os.getenv("S3_API_URL", "https://api.easyparkai.com/api/Common/Upload?modulename=anpr"),
             "max_retries": int(os.getenv("MAX_RETRIES", "5")),
             "retry_delay": int(os.getenv("RETRY_DELAY", "5")),
@@ -1121,6 +1131,8 @@ def update_config():
             "camera_password": "CAMERA_PASSWORD", 
             "camera_1_ip": "CAMERA_1_IP",
             "camera_2_ip": "CAMERA_2_IP",
+            "camera_1_enabled": "CAMERA_1_ENABLED",
+            "camera_2_enabled": "CAMERA_2_ENABLED",
             "s3_api_url": "S3_API_URL",
             "max_retries": "MAX_RETRIES",
             "retry_delay": "RETRY_DELAY",
@@ -1373,9 +1385,12 @@ def health_check():
         # Check Firebase connection
         health_status["firebase"] = db is not None and is_internet_available()
         
-        # Check camera connectivity
-        health_status["camera_1"] = check_camera_health("camera_1")
-        health_status["camera_2"] = check_camera_health("camera_2")
+        # Check camera connectivity (only if enabled)
+        camera_1_enabled = os.getenv("CAMERA_1_ENABLED", "true").lower() == "true"
+        camera_2_enabled = os.getenv("CAMERA_2_ENABLED", "true").lower() == "true"
+        
+        health_status["camera_1"] = check_camera_health("camera_1") if camera_1_enabled else None
+        health_status["camera_2"] = check_camera_health("camera_2") if camera_2_enabled else None
         
         return jsonify(health_status)
         
