@@ -1691,7 +1691,41 @@ def system_reset():
         def delayed_restart():
             time.sleep(2)  # Give time for response to be sent
             logging.info("Restarting application...")
-            os._exit(0)  # Force exit - will be restarted by systemd/supervisor
+            
+            try:
+                # Try to restart using subprocess
+                import subprocess
+                import sys
+                
+                # Get the current script path
+                script_path = os.path.abspath(__file__)
+                python_executable = sys.executable
+                script_dir = os.path.dirname(script_path)
+                
+                # Try using the restart script first
+                restart_script = os.path.join(script_dir, 'restart_rfid.py')
+                if os.path.exists(restart_script):
+                    logging.info("Using restart script for graceful restart")
+                    subprocess.Popen([python_executable, restart_script], 
+                                   cwd=script_dir,
+                                   stdout=subprocess.DEVNULL,
+                                   stderr=subprocess.DEVNULL)
+                    time.sleep(2)
+                    os._exit(0)
+                else:
+                    # Fallback to direct restart
+                    logging.info("Using direct restart method")
+                    subprocess.Popen([python_executable, script_path], 
+                                   cwd=script_dir,
+                                   stdout=subprocess.DEVNULL,
+                                   stderr=subprocess.DEVNULL)
+                    time.sleep(1)
+                    os._exit(0)
+                
+            except Exception as restart_error:
+                logging.error(f"Error during restart: {restart_error}")
+                # Fallback to simple exit
+                os._exit(0)
         
         # Start restart in background thread
         threading.Thread(target=delayed_restart, daemon=True).start()

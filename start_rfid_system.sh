@@ -102,6 +102,13 @@ run_direct() {
     python3 $PYTHON_SCRIPT
 }
 
+# Function to restart using Python script
+restart_python() {
+    echo -e "${YELLOW}Restarting RFID system using Python script...${NC}"
+    cd $SCRIPT_DIR
+    python3 restart_rfid.py
+}
+
 # Main menu
 case "$1" in
     "start")
@@ -125,22 +132,27 @@ case "$1" in
     "run")
         run_direct
         ;;
+    "restart-python")
+        restart_python
+        ;;
     *)
-        echo "Usage: $0 {start|stop|restart|status|install|uninstall|run}"
+        echo "Usage: $0 {start|stop|restart|status|install|uninstall|run|restart-python}"
         echo ""
         echo "Commands:"
-        echo "  start     - Start the RFID system service"
-        echo "  stop      - Stop the RFID system service"
-        echo "  restart   - Restart the RFID system service"
-        echo "  status    - Show service status and recent logs"
-        echo "  install   - Install systemd service for auto-start"
-        echo "  uninstall - Remove systemd service"
-        echo "  run       - Run directly (development mode)"
+        echo "  start          - Start the RFID system service"
+        echo "  stop           - Stop the RFID system service"
+        echo "  restart        - Restart the RFID system service"
+        echo "  restart-python - Restart using Python script (no service required)"
+        echo "  status         - Show service status and recent logs"
+        echo "  install        - Install systemd service for auto-start"
+        echo "  uninstall      - Remove systemd service"
+        echo "  run            - Run directly (development mode)"
         echo ""
         echo "Examples:"
-        echo "  $0 install    # Install as system service"
-        echo "  $0 start      # Start the service"
-        echo "  $0 status     # Check status"
-        echo "  $0 run        # Run directly for testing"
+        echo "  $0 install         # Install as system service"
+        echo "  $0 start           # Start the service"
+        echo "  $0 restart-python  # Restart without service (standalone)"
+        echo "  $0 status          # Check status"
+        echo "  $0 run             # Run directly for testing"
         ;;
 esac
