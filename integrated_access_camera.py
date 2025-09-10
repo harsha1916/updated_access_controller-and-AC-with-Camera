@@ -1069,7 +1069,8 @@ def get_config():
             "retry_delay": int(os.getenv("RETRY_DELAY", "5")),
             "bind_ip": os.getenv("BIND_IP", "192.168.1.33"),
             "bind_port": int(os.getenv("BIND_PORT", "9000")),
-            "api_key": os.getenv("API_KEY", "your-api-key-change-this")
+            "api_key": os.getenv("API_KEY", "your-api-key-change-this"),
+            "scan_delay_seconds": int(os.getenv("SCAN_DELAY_SECONDS", "60"))
         }
         
         return jsonify(config)
@@ -1112,12 +1113,18 @@ def update_config():
             "retry_delay": "RETRY_DELAY",
             "bind_ip": "BIND_IP",
             "bind_port": "BIND_PORT",
-            "api_key": "API_KEY"
+            "api_key": "API_KEY",
+            "scan_delay_seconds": "SCAN_DELAY_SECONDS"
         }
         
         for key, env_key in config_mapping.items():
             if key in config_data:
                 env_vars[env_key] = str(config_data[key])
+                # Update rate limiter dynamically if scan_delay_seconds is changed
+                if key == "scan_delay_seconds":
+                    new_delay = int(config_data[key])
+                    rate_limiter.delay = new_delay
+                    logging.info(f"Rate limiter delay updated to {new_delay} seconds")
         
         # Write updated .env file
         with open(env_file, 'w') as f:
