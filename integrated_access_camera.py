@@ -541,7 +541,7 @@ def capture_for_reader_async(reader_id: int, card_int: int):
         card_str = str(card_int)
         safe = _sanitize_card_number(card_str)
         ts = int(time.time())
-        filename = f"{safe}_{ts}.jpg"  # required format: tag + timestamp
+        filename = f"{safe}_r{reader_id}_{ts}.jpg"  # format: card_reader_timestamp
         filepath = os.path.join(IMAGES_DIR, filename)
 
         camera_key = "camera_1" if reader_id == 1 else "camera_2"
@@ -1366,6 +1366,121 @@ def transaction_cache_status():
     except Exception as e:
         logging.error(f"Error checking cache status: {e}")
         return jsonify({"status": "error", "message": f"Error checking cache: {str(e)}"}), 500
+
+# --- Offline Images Management ---
+@app.route("/get_offline_images", methods=["GET"])
+def get_offline_images():
+    """Get all offline images with reader information."""
+    try:
+        images = []
+        
+        if not os.path.exists(IMAGES_DIR):
+            return jsonify({"images": []})
+        
+        for filename in os.listdir(IMAGES_DIR):
+            if filename.lower().endswith(('.jpg', '.jpeg')):
+                filepath = os.path.join(IMAGES_DIR, filename)
+                if os.path.isfile(filepath):
+                    try:
+                        # Extract card number, reader, and timestamp from filename
+                        name_without_ext = os.path.splitext(filename)[0]
+                        parts = name_without_ext.split('_')
+                        
+                        if len(parts) >= 3:
+                            # New format: card_reader_timestamp
+                            card_number = parts[0]
+                            reader_str = parts[1]
+                            timestamp = int(parts[2])
+                            
+                            # Extract reader number from "r1" or "r2"
+                            if reader_str.startswith('r'):
+                                reader = int(reader_str[1:])
+                            else:
+                                reader = 1  # fallback
+                        elif len(parts) >= 2:
+                            # Old format: card_timestamp (backward compatibility)
+                            card_number = parts[0]
+                            timestamp = int(parts[-1])
+                            reader = 1  # default to reader 1 for old format
+                        else:
+                            card_number = "unknown"
+                            timestamp = int(os.path.getmtime(filepath))
+                            reader = 1
+                        
+                        # Check upload status
+                        uploaded_sidecar = filepath + ".uploaded.json"
+                        uploaded = None
+                        s3_location = None
+                        
+                        if os.path.exists(uploaded_sidecar):
+                            try:
+                                with open(uploaded_sidecar, 'r') as f:
+                                    upload_data = json.load(f)
+                                    uploaded = True
+                                    s3_location = upload_data.get('s3_location', '')
+                            except Exception as e:
+                                logging.error(f"Error reading upload sidecar for {filename}: {e}")
+                                uploaded = False
+                        else:
+                            uploaded = False
+                        
+                        images.append({
+                            "filename": filename,
+                            "card_number": card_number,
+                            "timestamp": timestamp,
+                            "reader": reader,
+                            "uploaded": uploaded,
+                            "s3_location": s3_location,
+                            "file_size": os.path.getsize(filepath)
+                        })
+                        
+                    except Exception as e:
+                        logging.error(f"Error processing image {filename}: {e}")
+                        continue
+        
+        # Sort by timestamp (newest first)
+        images.sort(key=lambda x: x['timestamp'], reverse=True)
+        
+        return jsonify({"images": images})
+        
+    except Exception as e:
+        logging.error(f"Error fetching offline images: {e}")
+        return jsonify({"status": "error", "message": f"Error fetching offline images: {str(e)}"}), 500
+
+@app.route("/clear_all_offline_images", methods=["POST"])
+@require_api_key
+def clear_all_offline_images():
+    """Clear all offline images."""
+    try:
+        if not os.path.exists(IMAGES_DIR):
+            return jsonify({"status": "success", "deleted_count": 0, "message": "No images directory found"})
+        
+        deleted_count = 0
+        
+        for filename in os.listdir(IMAGES_DIR):
+            if filename.lower().endswith(('.jpg', '.jpeg')):
+                filepath = os.path.join(IMAGES_DIR, filename)
+                if os.path.isfile(filepath):
+                    try:
+                        os.remove(filepath)
+                        # Also remove upload sidecar if exists
+                        sidecar_path = filepath + ".uploaded.json"
+                        if os.path.exists(sidecar_path):
+                            os.remove(sidecar_path)
+                        deleted_count += 1
+                    except Exception as e:
+                        logging.error(f"Error deleting {filepath}: {e}")
+        
+        logging.info(f"Cleared {deleted_count} offline images")
+        return jsonify({
+            "status": "success",
+            "deleted_count": deleted_count,
+            "message": f"Cleared {deleted_count} offline images"
+        })
+        
+    except Exception as e:
+        logging.error(f"Error clearing offline images: {e}")
+        return jsonify({"status": "error", "message": f"Error clearing images: {str(e)}"}), 500
 
 # --- System Health Check ---
 @app.route("/health_check", methods=["GET"])

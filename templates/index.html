@@ -72,6 +72,29 @@
             border-color: #28a745;
             box-shadow: 0 0 0 0.25rem rgba(40, 167, 69, 0.25);
         }
+
+        .image-card {
+            transition: transform 0.2s ease-in-out;
+            border: 1px solid #dee2e6;
+        }
+
+        .image-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+
+        .image-card .card-img-top {
+            transition: opacity 0.2s ease-in-out;
+        }
+
+        .image-card:hover .card-img-top {
+            opacity: 0.9;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            border: 1px solid #dee2e6;
+        }
         .stats-card {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
@@ -146,6 +169,11 @@
             <li class="nav-item" role="presentation">
                 <button class="nav-link" id="storage-tab" data-bs-toggle="tab" data-bs-target="#storage" type="button" role="tab">
                     <i class="fas fa-chart-pie"></i> Storage & Analytics
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="offline-images-tab" data-bs-toggle="tab" data-bs-target="#offline-images" type="button" role="tab">
+                    <i class="fas fa-images"></i> Offline Images
                 </button>
             </li>
         </ul>
@@ -792,6 +820,118 @@
             </div>
         </div>
     </div>
+
+    <!-- Offline Images Tab -->
+    <div class="tab-pane fade" id="offline-images" role="tabpanel">
+        <div class="container-fluid mt-3">
+            <!-- Filter and Controls -->
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0"><i class="fas fa-images"></i> Offline Images Gallery</h5>
+                            <div>
+                                <button class="btn btn-sm btn-outline-primary" onclick="refreshOfflineImages()">
+                                    <i class="fas fa-sync-alt"></i> Refresh
+                                </button>
+                                <button class="btn btn-sm btn-outline-danger" onclick="clearAllOfflineImages()">
+                                    <i class="fas fa-trash"></i> Clear All
+                                </button>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <!-- Filter Controls -->
+                            <div class="row mb-3">
+                                <div class="col-md-3">
+                                    <label for="imageFilter" class="form-label">Filter by Entry Type:</label>
+                                    <select class="form-select" id="imageFilter" onchange="filterOfflineImages()">
+                                        <option value="all">All Images</option>
+                                        <option value="in">In (Reader 1)</option>
+                                        <option value="out">Out (Reader 2)</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <label for="uploadStatusFilter" class="form-label">Filter by Upload Status:</label>
+                                    <select class="form-select" id="uploadStatusFilter" onchange="filterOfflineImages()">
+                                        <option value="all">All Status</option>
+                                        <option value="uploaded">Uploaded</option>
+                                        <option value="pending">Pending</option>
+                                        <option value="failed">Failed</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <label for="dateFilter" class="form-label">Filter by Date:</label>
+                                    <input type="date" class="form-control" id="dateFilter" onchange="filterOfflineImages()">
+                                </div>
+                                <div class="col-md-3">
+                                    <label for="searchCard" class="form-label">Search by Card Number:</label>
+                                    <input type="text" class="form-control" id="searchCard" placeholder="Enter card number" onkeyup="filterOfflineImages()">
+                                </div>
+                            </div>
+                            
+                            <!-- Statistics -->
+                            <div class="row mb-3">
+                                <div class="col-md-3">
+                                    <div class="stat-card text-center p-2 border rounded">
+                                        <h6 class="text-primary mb-1" id="totalOfflineImages">0</h6>
+                                        <small>Total Images</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="stat-card text-center p-2 border rounded">
+                                        <h6 class="text-success mb-1" id="inImages">0</h6>
+                                        <small>In (Reader 1)</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="stat-card text-center p-2 border rounded">
+                                        <h6 class="text-info mb-1" id="outImages">0</h6>
+                                        <small>Out (Reader 2)</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="stat-card text-center p-2 border rounded">
+                                        <h6 class="text-warning mb-1" id="pendingUploads">0</h6>
+                                        <small>Pending Upload</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Images Grid -->
+            <div class="row">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0"><i class="fas fa-th"></i> Image Gallery</h5>
+                        </div>
+                        <div class="card-body">
+                            <div id="offlineImagesContainer" class="row">
+                                <!-- Images will be loaded here -->
+                            </div>
+                            
+                            <!-- Load More Button -->
+                            <div class="text-center mt-4" id="loadMoreContainer" style="display: none;">
+                                <button class="btn btn-outline-primary" onclick="loadMoreOfflineImages()">
+                                    <i class="fas fa-plus"></i> Load More Images
+                                </button>
+                            </div>
+                            
+                            <!-- No Images Message -->
+                            <div id="noImagesMessage" class="text-center text-muted py-5" style="display: none;">
+                                <i class="fas fa-images fa-3x mb-3"></i>
+                                <h5>No offline images found</h5>
+                                <p>Images will appear here when RFID cards are scanned</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
     <!-- Floating Refresh Button -->
@@ -1121,6 +1261,11 @@
             // Load storage data when Storage tab is clicked
             document.getElementById('storage-tab').addEventListener('click', function() {
                 loadStorageData();
+            });
+
+            // Load offline images when Offline Images tab is clicked
+            document.getElementById('offline-images-tab').addEventListener('click', function() {
+                loadOfflineImages();
             });
 
             // Change password form
@@ -1746,6 +1891,221 @@
                 status.className = 'badge bg-danger';
                 status.textContent = 'Offline';
             }
+        }
+
+        // =========================
+        // Offline Images Functions
+        // =========================
+        let offlineImagesData = [];
+        let filteredOfflineImages = [];
+        let currentPage = 0;
+        const imagesPerPage = 20;
+
+        async function loadOfflineImages() {
+            try {
+                const response = await fetch('/get_offline_images');
+                const data = await response.json();
+                
+                offlineImagesData = data.images || [];
+                filteredOfflineImages = [...offlineImagesData];
+                currentPage = 0;
+                
+                updateOfflineImagesStats();
+                displayOfflineImages();
+                
+            } catch (error) {
+                console.error('Error loading offline images:', error);
+                showNotification('Error loading offline images', 'danger');
+            }
+        }
+
+        function updateOfflineImagesStats() {
+            const totalImages = offlineImagesData.length;
+            const inImages = offlineImagesData.filter(img => img.reader === 1).length;
+            const outImages = offlineImagesData.filter(img => img.reader === 2).length;
+            const pendingUploads = offlineImagesData.filter(img => img.uploaded === false).length;
+            
+            document.getElementById('totalOfflineImages').textContent = totalImages;
+            document.getElementById('inImages').textContent = inImages;
+            document.getElementById('outImages').textContent = outImages;
+            document.getElementById('pendingUploads').textContent = pendingUploads;
+        }
+
+        function filterOfflineImages() {
+            const entryFilter = document.getElementById('imageFilter').value;
+            const statusFilter = document.getElementById('uploadStatusFilter').value;
+            const dateFilter = document.getElementById('dateFilter').value;
+            const cardSearch = document.getElementById('searchCard').value.toLowerCase();
+            
+            filteredOfflineImages = offlineImagesData.filter(img => {
+                // Entry type filter
+                if (entryFilter !== 'all') {
+                    if (entryFilter === 'in' && img.reader !== 1) return false;
+                    if (entryFilter === 'out' && img.reader !== 2) return false;
+                }
+                
+                // Upload status filter
+                if (statusFilter !== 'all') {
+                    if (statusFilter === 'uploaded' && img.uploaded !== true) return false;
+                    if (statusFilter === 'pending' && img.uploaded !== false) return false;
+                    if (statusFilter === 'failed' && img.uploaded !== false) return false;
+                }
+                
+                // Date filter
+                if (dateFilter) {
+                    const imgDate = new Date(img.timestamp * 1000).toISOString().split('T')[0];
+                    if (imgDate !== dateFilter) return false;
+                }
+                
+                // Card number search
+                if (cardSearch && !img.card_number.toLowerCase().includes(cardSearch)) return false;
+                
+                return true;
+            });
+            
+            currentPage = 0;
+            displayOfflineImages();
+        }
+
+        function displayOfflineImages() {
+            const container = document.getElementById('offlineImagesContainer');
+            const noImagesMessage = document.getElementById('noImagesMessage');
+            const loadMoreContainer = document.getElementById('loadMoreContainer');
+            
+            if (filteredOfflineImages.length === 0) {
+                container.innerHTML = '';
+                noImagesMessage.style.display = 'block';
+                loadMoreContainer.style.display = 'none';
+                return;
+            }
+            
+            noImagesMessage.style.display = 'none';
+            
+            const startIndex = currentPage * imagesPerPage;
+            const endIndex = Math.min(startIndex + imagesPerPage, filteredOfflineImages.length);
+            const imagesToShow = filteredOfflineImages.slice(startIndex, endIndex);
+            
+            let html = '';
+            imagesToShow.forEach(img => {
+                const entryType = img.reader === 1 ? 'In' : 'Out';
+                const entryClass = img.reader === 1 ? 'success' : 'info';
+                const uploadStatus = getUploadStatus(img.uploaded);
+                const uploadIcon = getUploadIcon(img.uploaded);
+                const date = new Date(img.timestamp * 1000).toLocaleString();
+                
+                html += `
+                    <div class="col-md-3 mb-3">
+                        <div class="card image-card">
+                            <div class="position-relative">
+                                <img src="/serve_image/${img.filename}" class="card-img-top" alt="RFID Image" 
+                                     style="height: 200px; object-fit: cover; cursor: pointer;"
+                                     onclick="openImageModal('/serve_image/${img.filename}', '${img.filename}')">
+                                <div class="position-absolute top-0 start-0 m-2">
+                                    <span class="badge bg-${entryClass}">${entryType}</span>
+                                </div>
+                                <div class="position-absolute top-0 end-0 m-2">
+                                    <span class="badge bg-${uploadStatus.color}">
+                                        <i class="${uploadIcon}"></i>
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="card-body p-2">
+                                <h6 class="card-title mb-1">Card: ${img.card_number}</h6>
+                                <p class="card-text mb-1">
+                                    <small class="text-muted">
+                                        <i class="fas fa-clock"></i> ${date}
+                                    </small>
+                                </p>
+                                <p class="card-text mb-1">
+                                    <small class="text-muted">
+                                        <i class="fas fa-hdd"></i> ${formatBytes(img.file_size)}
+                                    </small>
+                                </p>
+                                <div class="d-flex justify-content-between">
+                                    <button class="btn btn-sm btn-outline-primary" onclick="downloadImage('${img.filename}')">
+                                        <i class="fas fa-download"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-danger" onclick="deleteOfflineImage('${img.filename}')">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            if (currentPage === 0) {
+                container.innerHTML = html;
+            } else {
+                container.innerHTML += html;
+            }
+            
+            // Show/hide load more button
+            if (endIndex < filteredOfflineImages.length) {
+                loadMoreContainer.style.display = 'block';
+            } else {
+                loadMoreContainer.style.display = 'none';
+            }
+        }
+
+        function loadMoreOfflineImages() {
+            currentPage++;
+            displayOfflineImages();
+        }
+
+        async function refreshOfflineImages() {
+            await loadOfflineImages();
+            showNotification('Offline images refreshed', 'success');
+        }
+
+        async function clearAllOfflineImages() {
+            if (confirm('Are you sure you want to delete all offline images? This action cannot be undone.')) {
+                try {
+                    const response = await fetch('/clear_all_offline_images', {
+                        method: 'POST',
+                        headers: getAuthHeaders()
+                    });
+                    
+                    const result = await response.json();
+                    if (result.status === 'success') {
+                        showNotification(`Cleared ${result.deleted_count} offline images`, 'success');
+                        await loadOfflineImages();
+                    } else {
+                        showNotification(result.message || 'Clear failed', 'danger');
+                    }
+                } catch (error) {
+                    showNotification(`Error clearing images: ${error.message}`, 'danger');
+                }
+            }
+        }
+
+        async function deleteOfflineImage(filename) {
+            if (confirm(`Are you sure you want to delete image ${filename}?`)) {
+                try {
+                    const response = await fetch(`/delete_image/${filename}`, {
+                        method: 'DELETE',
+                        headers: getAuthHeaders()
+                    });
+                    
+                    const result = await response.json();
+                    if (result.status === 'success') {
+                        showNotification('Image deleted successfully', 'success');
+                        await loadOfflineImages();
+                    } else {
+                        showNotification(result.message || 'Delete failed', 'danger');
+                    }
+                } catch (error) {
+                    showNotification(`Error deleting image: ${error.message}`, 'danger');
+                }
+            }
+        }
+
+        function downloadImage(filename) {
+            const link = document.createElement('a');
+            link.href = `/serve_image/${filename}`;
+            link.download = filename;
+            link.click();
         }
 
         // =========================
