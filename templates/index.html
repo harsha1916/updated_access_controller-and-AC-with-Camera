@@ -871,28 +871,37 @@
                             
                             <!-- Statistics -->
                             <div class="row mb-3">
-                                <div class="col-md-3">
+                                <div class="col-md-2">
                                     <div class="stat-card text-center p-2 border rounded">
                                         <h6 class="text-primary mb-1" id="totalOfflineImages">0</h6>
                                         <small>Total Images</small>
                                     </div>
                                 </div>
-                                <div class="col-md-3">
+                                <div class="col-md-2">
                                     <div class="stat-card text-center p-2 border rounded">
                                         <h6 class="text-success mb-1" id="inImages">0</h6>
                                         <small>In (Reader 1)</small>
                                     </div>
                                 </div>
-                                <div class="col-md-3">
+                                <div class="col-md-2">
                                     <div class="stat-card text-center p-2 border rounded">
                                         <h6 class="text-info mb-1" id="outImages">0</h6>
                                         <small>Out (Reader 2)</small>
                                     </div>
                                 </div>
-                                <div class="col-md-3">
+                                <div class="col-md-2">
                                     <div class="stat-card text-center p-2 border rounded">
                                         <h6 class="text-warning mb-1" id="pendingUploads">0</h6>
                                         <small>Pending Upload</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="stat-card text-center p-2 border rounded">
+                                        <h6 class="text-secondary mb-1" id="storageUsage">0 GB / 20 GB</h6>
+                                        <div class="progress mt-1" style="height: 6px;">
+                                            <div class="progress-bar" id="storageProgressBar" role="progressbar" style="width: 0%"></div>
+                                        </div>
+                                        <small>Storage Usage</small>
                                     </div>
                                 </div>
                             </div>
@@ -1903,14 +1912,21 @@
 
         async function loadOfflineImages() {
             try {
-                const response = await fetch('/get_offline_images');
-                const data = await response.json();
+                // Load images and storage info in parallel
+                const [imagesResponse, storageResponse] = await Promise.all([
+                    fetch('/get_offline_images'),
+                    fetch('/get_storage_info')
+                ]);
                 
-                offlineImagesData = data.images || [];
+                const imagesData = await imagesResponse.json();
+                const storageData = await storageResponse.json();
+                
+                offlineImagesData = imagesData.images || [];
                 filteredOfflineImages = [...offlineImagesData];
                 currentPage = 0;
                 
                 updateOfflineImagesStats();
+                updateStorageInfo(storageData);
                 displayOfflineImages();
                 
             } catch (error) {
@@ -1929,6 +1945,26 @@
             document.getElementById('inImages').textContent = inImages;
             document.getElementById('outImages').textContent = outImages;
             document.getElementById('pendingUploads').textContent = pendingUploads;
+        }
+
+        function updateStorageInfo(storageData) {
+            const usageGB = storageData.current_usage_gb;
+            const maxGB = storageData.max_storage_gb;
+            const percentage = storageData.usage_percentage;
+            
+            document.getElementById('storageUsage').textContent = `${usageGB} GB / ${maxGB} GB`;
+            
+            const progressBar = document.getElementById('storageProgressBar');
+            progressBar.style.width = `${percentage}%`;
+            
+            // Color coding based on usage
+            if (percentage >= 90) {
+                progressBar.className = 'progress-bar bg-danger';
+            } else if (percentage >= 75) {
+                progressBar.className = 'progress-bar bg-warning';
+            } else {
+                progressBar.className = 'progress-bar bg-success';
+            }
         }
 
         function filterOfflineImages() {
@@ -2101,11 +2137,31 @@
             }
         }
 
-        function downloadImage(filename) {
-            const link = document.createElement('a');
-            link.href = `/serve_image/${filename}`;
-            link.download = filename;
-            link.click();
+        async function downloadImage(filename) {
+            try {
+                const response = await fetch(`/serve_image/${filename}`, {
+                    headers: getAuthHeaders()
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = filename;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                window.URL.revokeObjectURL(url);
+                
+                showNotification('Image downloaded successfully', 'success');
+            } catch (error) {
+                console.error('Error downloading image:', error);
+                showNotification(`Error downloading image: ${error.message}`, 'danger');
+            }
         }
 
         // =========================

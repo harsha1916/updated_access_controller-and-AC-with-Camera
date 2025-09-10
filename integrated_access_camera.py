@@ -36,6 +36,11 @@ image_queue = Queue()  # for background S3 uploads (non-blocking)
 IMAGES_DIR = os.environ.get("IMAGES_DIR", "images")
 os.makedirs(IMAGES_DIR, exist_ok=True)
 
+# Storage Management Configuration
+MAX_STORAGE_GB = int(os.environ.get("MAX_STORAGE_GB", "20"))  # Maximum storage for images (20GB)
+CLEANUP_THRESHOLD_GB = int(os.environ.get("CLEANUP_THRESHOLD_GB", "10"))  # Amount to delete when limit reached (10GB)
+STORAGE_CHECK_INTERVAL = int(os.environ.get("STORAGE_CHECK_INTERVAL", "300"))  # Check storage every 5 minutes
+
 # GPIO Pins for Two Wiegand RFID Readers
 D0_PIN_1 = int(os.environ.get('D0_PIN_1', 18))  # Wiegand Data 0 (Reader 1 - Green)
 D1_PIN_1 = int(os.environ.get('D1_PIN_1', 23))  # Wiegand Data 1 (Reader 1 - White)
@@ -472,6 +477,100 @@ def _sanitize_card_number(card_number: str) -> str:
     allowed = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_"
     s = "".join(ch for ch in s if ch in allowed)
     return s[:50] if s else "unknown"
+
+def get_storage_usage():
+    """Get current storage usage in bytes."""
+    if not os.path.exists(IMAGES_DIR):
+        return 0
+    
+    total_size = 0
+    for filename in os.listdir(IMAGES_DIR):
+        filepath = os.path.join(IMAGES_DIR, filename)
+        if os.path.isfile(filepath):
+            total_size += os.path.getsize(filepath)
+    return total_size
+
+def cleanup_old_images():
+    """Automatically clean up old images when storage limit is reached."""
+    try:
+        current_usage = get_storage_usage()
+        max_bytes = MAX_STORAGE_GB * 1024 * 1024 * 1024  # Convert GB to bytes
+        cleanup_bytes = CLEANUP_THRESHOLD_GB * 1024 * 1024 * 1024  # Convert GB to bytes
+        
+        if current_usage < max_bytes:
+            return
+        
+        logging.info(f"Storage limit reached ({current_usage / (1024**3):.2f}GB). Starting cleanup...")
+        
+        # Get all image files with their timestamps
+        image_files = []
+        for filename in os.listdir(IMAGES_DIR):
+            if filename.lower().endswith(('.jpg', '.jpeg')):
+                filepath = os.path.join(IMAGES_DIR, filename)
+                if os.path.isfile(filepath):
+                    # Extract timestamp from filename
+                    name_without_ext = os.path.splitext(filename)[0]
+                    parts = name_without_ext.split('_')
+                    
+                    if len(parts) >= 3:
+                        # New format: card_reader_timestamp
+                        try:
+                            timestamp = int(parts[2])
+                        except ValueError:
+                            timestamp = int(os.path.getmtime(filepath))
+                    elif len(parts) >= 2:
+                        # Old format: card_timestamp
+                        try:
+                            timestamp = int(parts[-1])
+                        except ValueError:
+                            timestamp = int(os.path.getmtime(filepath))
+                    else:
+                        timestamp = int(os.path.getmtime(filepath))
+                    
+                    file_size = os.path.getsize(filepath)
+                    image_files.append((filepath, filename, timestamp, file_size))
+        
+        # Sort by timestamp (oldest first)
+        image_files.sort(key=lambda x: x[2])
+        
+        # Delete oldest images until we've freed up enough space
+        deleted_size = 0
+        deleted_count = 0
+        
+        for filepath, filename, timestamp, file_size in image_files:
+            if deleted_size >= cleanup_bytes:
+                break
+                
+            try:
+                os.remove(filepath)
+                # Also remove upload sidecar if exists
+                sidecar_path = filepath + ".uploaded.json"
+                if os.path.exists(sidecar_path):
+                    os.remove(sidecar_path)
+                
+                deleted_size += file_size
+                deleted_count += 1
+                logging.info(f"Deleted old image: {filename}")
+                
+            except Exception as e:
+                logging.error(f"Error deleting {filename}: {e}")
+        
+        new_usage = get_storage_usage()
+        logging.info(f"Cleanup completed. Deleted {deleted_count} images ({deleted_size / (1024**3):.2f}GB). "
+                    f"New usage: {new_usage / (1024**3):.2f}GB")
+        
+    except Exception as e:
+        logging.error(f"Error during storage cleanup: {e}")
+
+def storage_monitor_worker():
+    """Background worker to monitor storage usage."""
+    while True:
+        try:
+            cleanup_old_images()
+            time.sleep(STORAGE_CHECK_INTERVAL)
+        except Exception as e:
+            logging.error(f"Error in storage monitor worker: {e}")
+            time.sleep(60)  # Wait 1 minute before retrying
 
 def _rtsp_capture_single(rtsp_url: str, filepath: str) -> bool:
     """Open RTSP, grab one frame, save JPEG. Retries using MAX_RETRIES/RETRY_DELAY."""
@@ -1482,6 +1581,33 @@ def clear_all_offline_images():
         logging.error(f"Error clearing offline images: {e}")
         return jsonify({"status": "error", "message": f"Error clearing images: {str(e)}"}), 500
 
+@app.route("/get_storage_info", methods=["GET"])
+def get_storage_info():
+    """Get storage information for images."""
+    try:
+        current_usage = get_storage_usage()
+        max_bytes = MAX_STORAGE_GB * 1024 * 1024 * 1024
+        cleanup_bytes = CLEANUP_THRESHOLD_GB * 1024 * 1024 * 1024
+        
+        usage_gb = current_usage / (1024**3)
+        max_gb = MAX_STORAGE_GB
+        cleanup_gb = CLEANUP_THRESHOLD_GB
+        usage_percentage = (current_usage / max_bytes) * 100 if max_bytes > 0 else 0
+        
+        return jsonify({
+            "current_usage_gb": round(usage_gb, 2),
+            "max_storage_gb": max_gb,
+            "cleanup_threshold_gb": cleanup_gb,
+            "usage_percentage": round(usage_percentage, 1),
+            "current_usage_bytes": current_usage,
+            "max_storage_bytes": max_bytes,
+            "cleanup_threshold_bytes": cleanup_bytes
+        })
+        
+    except Exception as e:
+        logging.error(f"Error getting storage info: {e}")
+        return jsonify({"status": "error", "message": f"Error getting storage info: {str(e)}"}), 500
+
 # --- System Health Check ---
 @app.route("/health_check", methods=["GET"])
 def health_check():
@@ -1976,6 +2102,7 @@ threading.Thread(target=transaction_uploader, daemon=True).start()
 threading.Thread(target=image_uploader_worker, daemon=True).start()
 threading.Thread(target=session_cleanup_worker, daemon=True).start()
 threading.Thread(target=daily_stats_cleanup_worker, daemon=True).start()
+threading.Thread(target=storage_monitor_worker, daemon=True).start()
 
 # Flask serve
 try:
