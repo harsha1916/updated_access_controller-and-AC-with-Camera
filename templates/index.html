@@ -1835,7 +1835,10 @@
                 try {
                     const response = await fetch('/system_reset', {
                         method: 'POST',
-                        headers: getAuthHeaders()
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-API-Key': getApiKey()
+                        }
                     });
                     
                     const result = await response.json();
@@ -2160,7 +2163,10 @@
                 try {
                     const response = await fetch('/clear_all_offline_images', {
                         method: 'POST',
-                        headers: getAuthHeaders()
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-API-Key': getApiKey()
+                        }
                     });
                     
                     const result = await response.json();
@@ -2181,7 +2187,10 @@
                 try {
                     const response = await fetch(`/delete_image/${filename}`, {
                         method: 'DELETE',
-                        headers: getAuthHeaders()
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-API-Key': getApiKey()
+                        }
                     });
                     
                     const result = await response.json();
