@@ -1149,7 +1149,7 @@
                 
                 return `
                     <div class="image-item position-relative">
-                        <img src="/image/${image.filename}" alt="${image.filename}" 
+                        <img src="/serve_image/${image.filename}" alt="${image.filename}" 
                              onclick="showImageModal('${image.filename}', '${image.card_number}', ${image.timestamp}, '${image.uploaded}', '${image.s3_location || ''}')"
                              style="cursor: pointer;">
                         <div class="upload-badge">
@@ -1176,7 +1176,7 @@
         }
 
         function showImageModal(filename, cardNumber, timestamp, uploaded, s3Location) {
-            document.getElementById('modalImage').src = `/image/${filename}`;
+            document.getElementById('modalImage').src = `/serve_image/${filename}`;
             document.getElementById('modalFileName').textContent = filename;
             document.getElementById('modalCardNumber').textContent = cardNumber;
             document.getElementById('modalTimestamp').textContent = new Date(timestamp * 1000).toLocaleString();
@@ -1186,6 +1186,18 @@
                 `<span class="badge bg-${uploadStatus.color}">${uploadStatus.text}</span>`;
             
             document.getElementById('modalS3Location').textContent = s3Location || 'Not uploaded';
+            
+            const modal = new bootstrap.Modal(document.getElementById('imageModal'));
+            modal.show();
+        }
+
+        function openImageModal(imageSrc, filename) {
+            document.getElementById('modalImage').src = imageSrc;
+            document.getElementById('modalFileName').textContent = filename;
+            document.getElementById('modalCardNumber').textContent = 'N/A';
+            document.getElementById('modalTimestamp').textContent = 'N/A';
+            document.getElementById('modalUploadStatus').innerHTML = '<span class="badge bg-secondary">Unknown</span>';
+            document.getElementById('modalS3Location').textContent = 'Not available';
             
             const modal = new bootstrap.Modal(document.getElementById('imageModal'));
             modal.show();

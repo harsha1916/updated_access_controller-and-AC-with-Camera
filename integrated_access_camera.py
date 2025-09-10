@@ -1129,15 +1129,19 @@ def serve_image(filename):
     try:
         # Security check - only allow jpg/jpeg files
         if not (filename.lower().endswith('.jpg') or filename.lower().endswith('.jpeg')):
+            logging.warning(f"Invalid file type requested: {filename}")
             return "Invalid file type", 400
         
         # Prevent directory traversal
         if '..' in filename or '/' in filename or '\\' in filename:
+            logging.warning(f"Invalid filename with path traversal: {filename}")
             return "Invalid filename", 400
         
         filepath = os.path.join(IMAGES_DIR, filename)
+        logging.info(f"Serving image: {filename} from {filepath}")
         
         if not os.path.exists(filepath):
+            logging.warning(f"Image not found: {filepath}")
             return "Image not found", 404
         
         from flask import send_file
