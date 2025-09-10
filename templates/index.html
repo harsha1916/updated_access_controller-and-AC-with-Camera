@@ -95,6 +95,17 @@
             background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
             border: 1px solid #dee2e6;
         }
+
+        .btn-outline-danger:hover {
+            background-color: #dc3545;
+            border-color: #dc3545;
+            color: white;
+        }
+
+        .btn-outline-danger {
+            border-color: #dc3545;
+            color: #dc3545;
+        }
         .stats-card {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
@@ -190,9 +201,14 @@
                         <div class="card">
                             <div class="card-header d-flex justify-content-between align-items-center">
                                 <h5 class="mb-0"><i class="fas fa-heartbeat"></i> System Health</h5>
-                                <button class="btn btn-sm btn-outline-primary" onclick="refreshHealthStatus()">
-                                    <i class="fas fa-sync-alt"></i> Refresh
-                                </button>
+                                <div>
+                                    <button class="btn btn-sm btn-outline-primary me-2" onclick="refreshHealthStatus()">
+                                        <i class="fas fa-sync-alt"></i> Refresh
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-danger" onclick="systemReset()">
+                                        <i class="fas fa-power-off"></i> Reset System
+                                    </button>
+                                </div>
                             </div>
                             <div class="card-body">
                                 <div class="row">
@@ -568,8 +584,11 @@
             <div class="row mt-4">
                 <div class="col-12">
                     <div class="card">
-                        <div class="card-header">
+                        <div class="card-header d-flex justify-content-between align-items-center">
                             <h5 class="mb-0"><i class="fas fa-server"></i> System Configuration</h5>
+                            <button class="btn btn-sm btn-outline-danger" onclick="systemReset()">
+                                <i class="fas fa-power-off"></i> Reset System
+                            </button>
                         </div>
                         <div class="card-body">
                             <div class="row">
@@ -1811,6 +1830,42 @@
         // =========================
         // System Health Check Functions
         // =========================
+        async function systemReset() {
+            if (confirm('Are you sure you want to reset the entire system? This will restart the application and may take a few seconds to come back online.')) {
+                try {
+                    const response = await fetch('/system_reset', {
+                        method: 'POST',
+                        headers: getAuthHeaders()
+                    });
+                    
+                    const result = await response.json();
+                    if (result.status === 'success') {
+                        showNotification('System reset initiated. The application will restart in a few seconds.', 'info');
+                        
+                        // Show countdown and redirect
+                        let countdown = 10;
+                        const countdownInterval = setInterval(() => {
+                            showNotification(`System restarting in ${countdown} seconds...`, 'warning');
+                            countdown--;
+                            
+                            if (countdown <= 0) {
+                                clearInterval(countdownInterval);
+                                showNotification('Redirecting to login page...', 'info');
+                                setTimeout(() => {
+                                    window.location.href = '/login';
+                                }, 2000);
+                            }
+                        }, 1000);
+                        
+                    } else {
+                        showNotification(result.message || 'Reset failed', 'danger');
+                    }
+                } catch (error) {
+                    console.error('Error during system reset:', error);
+                    showNotification(`Error during reset: ${error.message}`, 'danger');
+                }
+            }
+        }
         async function refreshHealthStatus() {
             try {
                 const response = await fetch('/health_check');

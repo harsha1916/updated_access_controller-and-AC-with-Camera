@@ -1680,6 +1680,31 @@ def trigger_storage_cleanup():
         logging.error(f"Error triggering storage cleanup: {e}")
         return jsonify({"status": "error", "message": f"Error triggering cleanup: {str(e)}"}), 500
 
+@app.route("/system_reset", methods=["POST"])
+@require_api_key
+def system_reset():
+    """Restart the entire application."""
+    try:
+        logging.info("System reset requested by user")
+        
+        # Schedule restart after a short delay to allow response
+        def delayed_restart():
+            time.sleep(2)  # Give time for response to be sent
+            logging.info("Restarting application...")
+            os._exit(0)  # Force exit - will be restarted by systemd/supervisor
+        
+        # Start restart in background thread
+        threading.Thread(target=delayed_restart, daemon=True).start()
+        
+        return jsonify({
+            "status": "success",
+            "message": "System restart initiated. The application will restart in a few seconds."
+        })
+        
+    except Exception as e:
+        logging.error(f"Error during system reset: {e}")
+        return jsonify({"status": "error", "message": f"Error during reset: {str(e)}"}), 500
+
 # --- System Health Check ---
 @app.route("/health_check", methods=["GET"])
 def health_check():
