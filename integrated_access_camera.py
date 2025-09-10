@@ -36,9 +36,10 @@ image_queue = Queue()  # for background S3 uploads (non-blocking)
 IMAGES_DIR = os.environ.get("IMAGES_DIR", "images")
 os.makedirs(IMAGES_DIR, exist_ok=True)
 
-# Storage Management Configuration
-MAX_STORAGE_GB = int(os.environ.get("MAX_STORAGE_GB", "20"))  # Maximum storage for images (20GB)
-CLEANUP_THRESHOLD_GB = int(os.environ.get("CLEANUP_THRESHOLD_GB", "10"))  # Amount to delete when limit reached (10GB)
+# Storage Management Configuration (Dynamic - based on available free space)
+# Fallback values for when dynamic calculation fails
+MAX_STORAGE_GB = int(os.environ.get("MAX_STORAGE_GB", "20"))  # Fallback maximum storage for images (20GB)
+CLEANUP_THRESHOLD_GB = int(os.environ.get("CLEANUP_THRESHOLD_GB", "10"))  # Fallback amount to delete when limit reached (10GB)
 STORAGE_CHECK_INTERVAL = int(os.environ.get("STORAGE_CHECK_INTERVAL", "300"))  # Check storage every 5 minutes
 
 # GPIO Pins for Two Wiegand RFID Readers
@@ -478,6 +479,20 @@ def _sanitize_card_number(card_number: str) -> str:
     s = "".join(ch for ch in s if ch in allowed)
     return s[:50] if s else "unknown"
 
+def get_disk_usage():
+    """Get disk usage information for the images directory."""
+    try:
+        import shutil
+        total, used, free = shutil.disk_usage(IMAGES_DIR)
+        return {
+            'total': total,
+            'used': used,
+            'free': free
+        }
+    except Exception as e:
+        logging.error(f"Error getting disk usage: {e}")
+        return None
+
 def get_storage_usage():
     """Get current storage usage in bytes."""
     if not os.path.exists(IMAGES_DIR):
@@ -490,12 +505,36 @@ def get_storage_usage():
             total_size += os.path.getsize(filepath)
     return total_size
 
+def get_dynamic_storage_limits():
+    """Calculate dynamic storage limits based on available free space."""
+    disk_info = get_disk_usage()
+    if not disk_info:
+        # Fallback to fixed limits if disk info unavailable
+        return MAX_STORAGE_GB, CLEANUP_THRESHOLD_GB
+    
+    free_space_gb = disk_info['free'] / (1024**3)
+    
+    # Allocate 60% of free space for images
+    max_storage_gb = int(free_space_gb * 0.6)
+    
+    # Delete 30% of allocated space when limit reached
+    cleanup_threshold_gb = int(max_storage_gb * 0.3)
+    
+    # Ensure minimum values
+    max_storage_gb = max(max_storage_gb, 1)  # At least 1GB
+    cleanup_threshold_gb = max(cleanup_threshold_gb, 0.5)  # At least 0.5GB
+    
+    return max_storage_gb, cleanup_threshold_gb
+
 def cleanup_old_images():
     """Automatically clean up old images when storage limit is reached."""
     try:
         current_usage = get_storage_usage()
-        max_bytes = MAX_STORAGE_GB * 1024 * 1024 * 1024  # Convert GB to bytes
-        cleanup_bytes = CLEANUP_THRESHOLD_GB * 1024 * 1024 * 1024  # Convert GB to bytes
+        
+        # Get dynamic storage limits based on available free space
+        max_storage_gb, cleanup_threshold_gb = get_dynamic_storage_limits()
+        max_bytes = max_storage_gb * 1024 * 1024 * 1024  # Convert GB to bytes
+        cleanup_bytes = cleanup_threshold_gb * 1024 * 1024 * 1024  # Convert GB to bytes
         
         if current_usage < max_bytes:
             return
@@ -1084,7 +1123,7 @@ def get_images():
         logging.error(f"Error fetching images: {e}")
         return jsonify({"status": "error", "message": f"Error fetching images: {str(e)}"}), 500
 
-@app.route("/image/<filename>")
+@app.route("/serve_image/<filename>")
 def serve_image(filename):
     """Serve image files from the images directory."""
     try:
@@ -1586,27 +1625,60 @@ def get_storage_info():
     """Get storage information for images."""
     try:
         current_usage = get_storage_usage()
-        max_bytes = MAX_STORAGE_GB * 1024 * 1024 * 1024
-        cleanup_bytes = CLEANUP_THRESHOLD_GB * 1024 * 1024 * 1024
+        
+        # Get dynamic storage limits based on available free space
+        max_storage_gb, cleanup_threshold_gb = get_dynamic_storage_limits()
+        max_bytes = max_storage_gb * 1024 * 1024 * 1024
+        cleanup_bytes = cleanup_threshold_gb * 1024 * 1024 * 1024
+        
+        # Get disk usage information
+        disk_info = get_disk_usage()
+        disk_total_gb = disk_info['total'] / (1024**3) if disk_info else 0
+        disk_free_gb = disk_info['free'] / (1024**3) if disk_info else 0
+        disk_used_gb = disk_info['used'] / (1024**3) if disk_info else 0
         
         usage_gb = current_usage / (1024**3)
-        max_gb = MAX_STORAGE_GB
-        cleanup_gb = CLEANUP_THRESHOLD_GB
         usage_percentage = (current_usage / max_bytes) * 100 if max_bytes > 0 else 0
         
         return jsonify({
             "current_usage_gb": round(usage_gb, 2),
-            "max_storage_gb": max_gb,
-            "cleanup_threshold_gb": cleanup_gb,
+            "max_storage_gb": max_storage_gb,
+            "cleanup_threshold_gb": cleanup_threshold_gb,
             "usage_percentage": round(usage_percentage, 1),
             "current_usage_bytes": current_usage,
             "max_storage_bytes": max_bytes,
-            "cleanup_threshold_bytes": cleanup_bytes
+            "cleanup_threshold_bytes": cleanup_bytes,
+            "disk_total_gb": round(disk_total_gb, 2),
+            "disk_free_gb": round(disk_free_gb, 2),
+            "disk_used_gb": round(disk_used_gb, 2),
+            "allocation_percentage": 60,  # 60% of free space allocated to images
+            "cleanup_percentage": 30      # 30% of allocated space cleaned up
         })
         
     except Exception as e:
         logging.error(f"Error getting storage info: {e}")
         return jsonify({"status": "error", "message": f"Error getting storage info: {str(e)}"}), 500
+
+@app.route("/trigger_storage_cleanup", methods=["POST"])
+@require_api_key
+def trigger_storage_cleanup():
+    """Manually trigger storage cleanup."""
+    try:
+        cleanup_old_images()
+        current_usage = get_storage_usage()
+        max_storage_gb, cleanup_threshold_gb = get_dynamic_storage_limits()
+        
+        return jsonify({
+            "status": "success",
+            "message": "Storage cleanup completed",
+            "current_usage_gb": round(current_usage / (1024**3), 2),
+            "max_storage_gb": max_storage_gb,
+            "cleanup_threshold_gb": cleanup_threshold_gb
+        })
+        
+    except Exception as e:
+        logging.error(f"Error triggering storage cleanup: {e}")
+        return jsonify({"status": "error", "message": f"Error triggering cleanup: {str(e)}"}), 500
 
 # --- System Health Check ---
 @app.route("/health_check", methods=["GET"])

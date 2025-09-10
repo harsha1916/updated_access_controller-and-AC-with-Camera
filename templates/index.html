@@ -897,11 +897,11 @@
                                 </div>
                                 <div class="col-md-4">
                                     <div class="stat-card text-center p-2 border rounded">
-                                        <h6 class="text-secondary mb-1" id="storageUsage">0 GB / 20 GB</h6>
+                                        <h6 class="text-secondary mb-1" id="storageUsage">0 GB / 0 GB</h6>
                                         <div class="progress mt-1" style="height: 6px;">
                                             <div class="progress-bar" id="storageProgressBar" role="progressbar" style="width: 0%"></div>
                                         </div>
-                                        <small>Storage Usage</small>
+                                        <small id="storageInfo">Storage Usage (60% of free space)</small>
                                     </div>
                                 </div>
                             </div>
@@ -1951,8 +1951,13 @@
             const usageGB = storageData.current_usage_gb;
             const maxGB = storageData.max_storage_gb;
             const percentage = storageData.usage_percentage;
+            const diskFreeGB = storageData.disk_free_gb;
+            const diskTotalGB = storageData.disk_total_gb;
+            const allocationPercentage = storageData.allocation_percentage;
             
             document.getElementById('storageUsage').textContent = `${usageGB} GB / ${maxGB} GB`;
+            document.getElementById('storageInfo').textContent = 
+                `Storage Usage (${allocationPercentage}% of ${diskFreeGB} GB free space)`;
             
             const progressBar = document.getElementById('storageProgressBar');
             progressBar.style.width = `${percentage}%`;
