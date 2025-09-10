@@ -412,21 +412,34 @@ def sync_transactions():
         batch_size = 10
         idx = 0
         synced = 0
+        failed_txns = []
+        
         while idx < len(txns):
             batch = txns[idx:idx + batch_size]
             for txn in batch:
                 try:
                     db.collection("transactions").add(txn)
                     synced += 1
+                    logging.info(f"Successfully synced transaction: {txn.get('card_number', 'unknown')}")
                 except google.api_core.exceptions.DeadlineExceeded:
-                    logging.warning("Firestore transaction timeout during sync")
+                    logging.warning(f"Firestore transaction timeout during sync for card: {txn.get('card_number', 'unknown')}")
+                    failed_txns.append(txn)
                 except Exception as e:
-                    logging.error(f"Error syncing transaction: {str(e)}")
+                    logging.error(f"Error syncing transaction {txn.get('card_number', 'unknown')}: {str(e)}")
+                    failed_txns.append(txn)
             idx += batch_size
             time.sleep(1)
-        if synced > 0:
+        
+        # Only remove the cache file if ALL transactions were synced successfully
+        if failed_txns:
+            # Update cache file with only failed transactions
+            atomic_write_json(TRANSACTION_CACHE_FILE, failed_txns)
+            logging.warning(f"Synced {synced} transactions, {len(failed_txns)} failed and kept in cache")
+        else:
+            # All transactions synced successfully, remove cache file
             os.remove(TRANSACTION_CACHE_FILE)
-            logging.info(f"Offline transactions synced: {synced}")
+            logging.info(f"All {synced} offline transactions synced successfully")
+            
     except Exception as e:
         logging.error(f"Error syncing transactions: {str(e)}")
 
@@ -1277,6 +1290,125 @@ def clear_all_stats():
     except Exception as e:
         logging.error(f"Error clearing all stats: {e}")
         return jsonify({"status": "error", "message": f"Error clearing stats: {str(e)}"}), 500
+
+# --- Transaction Sync Management ---
+@app.route("/sync_transactions", methods=["POST"])
+@require_api_key
+def manual_sync_transactions():
+    """Manually trigger transaction sync."""
+    try:
+        if not is_internet_available():
+            return jsonify({"status": "error", "message": "No internet connection"}), 400
+        
+        if db is None:
+            return jsonify({"status": "error", "message": "Firebase not available"}), 400
+        
+        # Check cache file status
+        if not os.path.exists(TRANSACTION_CACHE_FILE):
+            return jsonify({"status": "success", "message": "No cached transactions to sync"})
+        
+        cached_txns = read_json_or_default(TRANSACTION_CACHE_FILE, [])
+        if not cached_txns:
+            return jsonify({"status": "success", "message": "No cached transactions to sync"})
+        
+        # Trigger sync
+        sync_transactions()
+        
+        # Check remaining transactions
+        remaining_txns = read_json_or_default(TRANSACTION_CACHE_FILE, [])
+        
+        if remaining_txns:
+            return jsonify({
+                "status": "partial", 
+                "message": f"Synced some transactions, {len(remaining_txns)} still pending",
+                "remaining_count": len(remaining_txns)
+            })
+        else:
+            return jsonify({
+                "status": "success", 
+                "message": f"All {len(cached_txns)} transactions synced successfully"
+            })
+            
+    except Exception as e:
+        logging.error(f"Error in manual sync: {e}")
+        return jsonify({"status": "error", "message": f"Error syncing transactions: {str(e)}"}), 500
+
+@app.route("/transaction_cache_status", methods=["GET"])
+def transaction_cache_status():
+    """Get status of cached transactions."""
+    try:
+        if not os.path.exists(TRANSACTION_CACHE_FILE):
+            return jsonify({
+                "status": "success",
+                "cached_count": 0,
+                "message": "No cached transactions"
+            })
+        
+        cached_txns = read_json_or_default(TRANSACTION_CACHE_FILE, [])
+        return jsonify({
+            "status": "success",
+            "cached_count": len(cached_txns),
+            "message": f"{len(cached_txns)} transactions cached"
+        })
+        
+    except Exception as e:
+        logging.error(f"Error checking cache status: {e}")
+        return jsonify({"status": "error", "message": f"Error checking cache: {str(e)}"}), 500
+
+# --- System Health Check ---
+@app.route("/health_check", methods=["GET"])
+def health_check():
+    """Check system health including cameras, internet, and Firebase."""
+    try:
+        health_status = {
+            "internet": False,
+            "camera_1": False,
+            "camera_2": False,
+            "firebase": False
+        }
+        
+        # Check internet connectivity
+        health_status["internet"] = is_internet_available()
+        
+        # Check Firebase connection
+        health_status["firebase"] = db is not None and is_internet_available()
+        
+        # Check camera connectivity
+        health_status["camera_1"] = check_camera_health("camera_1")
+        health_status["camera_2"] = check_camera_health("camera_2")
+        
+        return jsonify(health_status)
+        
+    except Exception as e:
+        logging.error(f"Error checking system health: {e}")
+        return jsonify({
+            "internet": False,
+            "camera_1": False,
+            "camera_2": False,
+            "firebase": False,
+            "error": str(e)
+        }), 500
+
+def check_camera_health(camera_key):
+    """Check if a specific camera is accessible."""
+    try:
+        rtsp_url = RTSP_CAMERAS.get(camera_key)
+        if not rtsp_url:
+            return False
+        
+        # Try to open the camera stream
+        cap = cv2.VideoCapture(rtsp_url)
+        if cap.isOpened():
+            # Try to read a frame
+            ret, frame = cap.read()
+            cap.release()
+            return ret and frame is not None
+        else:
+            return False
+            
+    except Exception as e:
+        logging.error(f"Error checking camera {camera_key}: {e}")
+        return False
 
 # --- Block/Unblock ---
 @app.route("/block_user", methods=["GET"])

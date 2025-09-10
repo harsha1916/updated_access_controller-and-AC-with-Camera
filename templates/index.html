@@ -32,6 +32,32 @@
             right: 20px;
             z-index: 1000;
         }
+
+        .health-item {
+            padding: 15px;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+
+        .health-item:hover {
+            background-color: #f8f9fa;
+        }
+
+        .health-icon {
+            transition: all 0.3s ease;
+        }
+
+        .health-icon i {
+            color: #6c757d;
+        }
+
+        .health-icon i.text-success {
+            color: #28a745 !important;
+        }
+
+        .health-icon i.text-danger {
+            color: #dc3545 !important;
+        }
         .stats-card {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
@@ -116,6 +142,76 @@
         <!-- Dashboard Tab -->
         <div class="tab-pane fade show active" id="dashboard" role="tabpanel">
             <div class="container-fluid mt-3">
+                <!-- System Health Check -->
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h5 class="mb-0"><i class="fas fa-heartbeat"></i> System Health</h5>
+                                <button class="btn btn-sm btn-outline-primary" onclick="refreshHealthStatus()">
+                                    <i class="fas fa-sync-alt"></i> Refresh
+                                </button>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-3">
+                                        <div class="health-item text-center">
+                                            <div class="health-icon mb-2">
+                                                <i class="fas fa-wifi fa-2x" id="internetIcon"></i>
+                                            </div>
+                                            <h6>Internet Connection</h6>
+                                            <span class="badge" id="internetStatus">Checking...</span>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="health-item text-center">
+                                            <div class="health-icon mb-2">
+                                                <i class="fas fa-video fa-2x" id="camera1Icon"></i>
+                                            </div>
+                                            <h6>Camera 1 (Reader 1)</h6>
+                                            <span class="badge" id="camera1Status">Checking...</span>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="health-item text-center">
+                                            <div class="health-icon mb-2">
+                                                <i class="fas fa-video fa-2x" id="camera2Icon"></i>
+                                            </div>
+                                            <h6>Camera 2 (Reader 2)</h6>
+                                            <span class="badge" id="camera2Status">Checking...</span>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="health-item text-center">
+                                            <div class="health-icon mb-2">
+                                                <i class="fas fa-database fa-2x" id="firebaseIcon"></i>
+                                            </div>
+                                            <h6>Firebase Connection</h6>
+                                            <span class="badge" id="firebaseStatus">Checking...</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Transaction Sync Status -->
+                                <div class="row mt-3">
+                                    <div class="col-12">
+                                        <div class="alert alert-info d-flex justify-content-between align-items-center">
+                                            <div>
+                                                <i class="fas fa-sync-alt"></i>
+                                                <strong>Transaction Sync:</strong> 
+                                                <span id="transactionSyncStatus">Checking...</span>
+                                            </div>
+                                            <button class="btn btn-sm btn-outline-primary" onclick="manualSyncTransactions()">
+                                                <i class="fas fa-upload"></i> Sync Now
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Statistics Cards -->
                 <div class="row mb-4">
             <div class="col-md-3">
@@ -721,6 +817,9 @@
             try {
                 // Update connection status
                 updateConnectionStatus();
+                
+                // Refresh health status
+                await refreshHealthStatus();
                 
                 // Fetch and display scans
                 await fetchAndDisplayScans();
@@ -1510,6 +1609,98 @@
 
         // Initialize authentication check
         checkAuthentication();
+
+        // Initialize health check
+        refreshHealthStatus();
+
+        // =========================
+        // System Health Check Functions
+        // =========================
+        async function refreshHealthStatus() {
+            try {
+                const response = await fetch('/health_check');
+                const health = await response.json();
+                
+                updateHealthStatus('internet', health.internet);
+                updateHealthStatus('camera1', health.camera_1);
+                updateHealthStatus('camera2', health.camera_2);
+                updateHealthStatus('firebase', health.firebase);
+                
+                // Also check transaction cache status
+                await checkTransactionCacheStatus();
+                
+            } catch (error) {
+                console.error('Error checking health status:', error);
+                // Set all to error state
+                updateHealthStatus('internet', false);
+                updateHealthStatus('camera1', false);
+                updateHealthStatus('camera2', false);
+                updateHealthStatus('firebase', false);
+                document.getElementById('transactionSyncStatus').textContent = 'Error checking status';
+            }
+        }
+
+        async function checkTransactionCacheStatus() {
+            try {
+                const response = await fetch('/transaction_cache_status');
+                const result = await response.json();
+                
+                const statusElement = document.getElementById('transactionSyncStatus');
+                if (result.cached_count > 0) {
+                    statusElement.textContent = `${result.cached_count} transactions pending sync`;
+                    statusElement.className = 'text-warning';
+                } else {
+                    statusElement.textContent = 'All transactions synced';
+                    statusElement.className = 'text-success';
+                }
+            } catch (error) {
+                document.getElementById('transactionSyncStatus').textContent = 'Error checking cache';
+                document.getElementById('transactionSyncStatus').className = 'text-danger';
+            }
+        }
+
+        async function manualSyncTransactions() {
+            try {
+                const response = await fetch('/sync_transactions', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-API-Key': getApiKey()
+                    }
+                });
+                
+                const result = await response.json();
+                
+                if (result.status === 'success') {
+                    showNotification(result.message, 'success');
+                } else if (result.status === 'partial') {
+                    showNotification(result.message, 'warning');
+                } else {
+                    showNotification(result.message, 'danger');
+                }
+                
+                // Refresh the cache status
+                await checkTransactionCacheStatus();
+                
+            } catch (error) {
+                showNotification(`Error syncing transactions: ${error.message}`, 'danger');
+            }
+        }
+
+        function updateHealthStatus(component, isHealthy) {
+            const icon = document.getElementById(`${component}Icon`);
+            const status = document.getElementById(`${component}Status`);
+            
+            if (isHealthy) {
+                icon.className = icon.className.replace(/text-\w+/, 'text-success');
+                status.className = 'badge bg-success';
+                status.textContent = 'Online';
+            } else {
+                icon.className = icon.className.replace(/text-\w+/, 'text-danger');
+                status.className = 'badge bg-danger';
+                status.textContent = 'Offline';
+            }
+        }
 
         // =========================
         // Storage & Analytics Functions
