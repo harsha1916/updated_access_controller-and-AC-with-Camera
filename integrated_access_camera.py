@@ -824,6 +824,7 @@ def dashboard():
 @app.route("/change_password", methods=["POST"])
 def change_password():
     """Change admin password"""
+    global ADMIN_PASSWORD_HASH
     try:
         token = request.headers.get('Authorization', '').replace('Bearer ', '')
         if token not in active_sessions:
@@ -844,7 +845,7 @@ def change_password():
         new_password_hash = hash_password(new_password)
         
         # Update environment variable (this would need to be persisted to .env file)
-        global ADMIN_PASSWORD_HASH
+        
         ADMIN_PASSWORD_HASH = new_password_hash
         
         # Update .env file
