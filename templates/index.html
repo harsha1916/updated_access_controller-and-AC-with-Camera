@@ -367,49 +367,12 @@
                 <div class="card">
                     <div class="card-header d-flex justify-content-between align-items-center">
                         <h5 class="mb-0"><i class="fas fa-history"></i> Recent Scans</h5>
-                        <div class="d-flex align-items-center gap-2">
-                            <span class="badge bg-primary" id="scans-count">0</span>
-                            <span class="badge bg-info" id="scans-total">Total: 0</span>
-                        </div>
+                        <span class="badge bg-primary" id="scans-count">0</span>
                     </div>
-                    <div class="card-body">
-                        <!-- Filter Controls -->
-                        <div class="row mb-3">
-                            <div class="col-md-6">
-                                <div class="btn-group" role="group">
-                                    <input type="radio" class="btn-check" name="scanFilter" id="filterAll" value="all" checked>
-                                    <label class="btn btn-outline-primary btn-sm" for="filterAll">All</label>
-                                    
-                                    <input type="radio" class="btn-check" name="scanFilter" id="filterToday" value="today">
-                                    <label class="btn btn-outline-primary btn-sm" for="filterToday">Today</label>
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <input type="date" class="form-control form-control-sm" id="scanDateFilter" placeholder="Select Date">
-                            </div>
-                        </div>
-                        
-                        <!-- Scans Container -->
-                        <div style="max-height: 500px; overflow-y: auto;">
-                            <div id="scans-container">
-                                <div class="text-center text-muted">
-                                    <i class="fas fa-spinner fa-spin"></i> Loading scans...
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <!-- Pagination Controls -->
-                        <div class="d-flex justify-content-between align-items-center mt-3">
-                            <div>
-                                <button class="btn btn-sm btn-outline-secondary" id="prevPageBtn" onclick="loadPreviousPage()" disabled>
-                                    <i class="fas fa-chevron-left"></i> Previous
-                                </button>
-                                <button class="btn btn-sm btn-outline-secondary" id="nextPageBtn" onclick="loadNextPage()" disabled>
-                                    Next <i class="fas fa-chevron-right"></i>
-                                </button>
-                            </div>
-                            <div>
-                                <small class="text-muted" id="paginationInfo">Page 1 of 1</small>
+                    <div class="card-body" style="max-height: 600px; overflow-y: auto;">
+                        <div id="scans-container">
+                            <div class="text-center text-muted">
+                                <i class="fas fa-spinner fa-spin"></i> Loading scans...
                             </div>
                         </div>
                     </div>
@@ -629,21 +592,11 @@
                                 
                                 <div class="mb-3">
                                     <label for="camera1Rtsp" class="form-label">Camera 1 RTSP URL</label>
-                                    <div class="input-group">
-                                        <input type="text" class="form-control" id="camera1Rtsp" readonly>
-                                        <button class="btn btn-outline-secondary" type="button" onclick="toggleRtspEdit('camera1Rtsp')">
-                                            <i class="fas fa-edit"></i>
-                                        </button>
-                                    </div>
+                                    <input type="text" class="form-control" id="camera1Rtsp" readonly>
                                 </div>
                                 <div class="mb-3">
                                     <label for="camera2Rtsp" class="form-label">Camera 2 RTSP URL</label>
-                                    <div class="input-group">
-                                        <input type="text" class="form-control" id="camera2Rtsp" readonly>
-                                        <button class="btn btn-outline-secondary" type="button" onclick="toggleRtspEdit('camera2Rtsp')">
-                                            <i class="fas fa-edit"></i>
-                                        </button>
-                                    </div>
+                                    <input type="text" class="form-control" id="camera2Rtsp" readonly>
                                 </div>
                                 <button type="submit" class="btn btn-primary">
                                     <i class="fas fa-save"></i> Update Camera Config
@@ -1155,38 +1108,13 @@
             }
         }
 
-        // Pagination state
-        let currentPage = 1;
-        let currentLimit = 20;
-        let currentOffset = 0;
-        let currentFilter = 'all';
-        let currentDate = null;
-        let totalTransactions = 0;
-
         async function fetchAndDisplayScans() {
             try {
-                // Build query parameters
-                const params = new URLSearchParams({
-                    limit: currentLimit,
-                    offset: currentOffset
-                });
-                
-                if (currentFilter === 'today') {
-                    params.append('today_only', 'true');
-                } else if (currentDate) {
-                    params.append('date', currentDate);
-                }
-                
-                const response = await fetch(`/get_transactions?${params}`);
-                const data = await response.json();
-                
-                // Handle both old format (array) and new format (object with transactions)
-                const scans = data.transactions || data;
-                const total = data.total || scans.length;
+                const response = await fetch('/get_transactions');
+                const scans = await response.json();
                 
                 displayScans(scans);
-                updateScanStats(scans, total);
-                updatePaginationControls(data);
+                updateScanStats(scans);
                 
             } catch (error) {
                 console.error('Error fetching scans:', error);
@@ -1202,7 +1130,7 @@
             count.textContent = scans.length;
             
             if (scans.length === 0) {
-                container.innerHTML = '<div class="text-center text-muted">No scans found</div>';
+                container.innerHTML = '<div class="text-center text-muted">No recent scans</div>';
                 return;
             }
 
@@ -1236,47 +1164,14 @@
             container.innerHTML = scansHtml;
         }
 
-        function updateScanStats(scans, total) {
+        function updateScanStats(scans) {
+            const total = scans.length;
             const granted = scans.filter(s => s.status === 'Access Granted').length;
             const denied = scans.filter(s => s.status === 'Access Denied').length;
             
-            document.getElementById('total-scans').textContent = total || scans.length;
+            document.getElementById('total-scans').textContent = total;
             document.getElementById('granted-scans').textContent = granted;
             document.getElementById('denied-scans').textContent = denied;
-            document.getElementById('scans-total').textContent = `Total: ${total || scans.length}`;
-        }
-
-        function updatePaginationControls(data) {
-            const hasMore = data.has_more || false;
-            const total = data.total || 0;
-            const totalPages = Math.ceil(total / currentLimit);
-            
-            // Update pagination info
-            document.getElementById('paginationInfo').textContent = 
-                `Page ${currentPage} of ${totalPages} (${total} total)`;
-            
-            // Update button states
-            document.getElementById('prevPageBtn').disabled = currentPage <= 1;
-            document.getElementById('nextPageBtn').disabled = !hasMore;
-        }
-
-        function loadPreviousPage() {
-            if (currentPage > 1) {
-                currentPage--;
-                currentOffset = (currentPage - 1) * currentLimit;
-                fetchAndDisplayScans();
-            }
-        }
-
-        function loadNextPage() {
-            currentPage++;
-            currentOffset = (currentPage - 1) * currentLimit;
-            fetchAndDisplayScans();
-        }
-
-        function resetPagination() {
-            currentPage = 1;
-            currentOffset = 0;
         }
 
         async function fetchAndDisplayImages() {
@@ -1452,25 +1347,6 @@
             document.getElementById('cameraPassword').addEventListener('input', updateRtspUrls);
             document.getElementById('camera1Ip').addEventListener('input', updateRtspUrls);
             document.getElementById('camera2Ip').addEventListener('input', updateRtspUrls);
-
-            // Transaction filter event listeners
-            document.querySelectorAll('input[name="scanFilter"]').forEach(radio => {
-                radio.addEventListener('change', function() {
-                    currentFilter = this.value;
-                    currentDate = null;
-                    document.getElementById('scanDateFilter').value = '';
-                    resetPagination();
-                    fetchAndDisplayScans();
-                });
-            });
-
-            document.getElementById('scanDateFilter').addEventListener('change', function() {
-                currentDate = this.value;
-                currentFilter = 'date';
-                document.querySelector('input[name="scanFilter"][value="all"]').checked = true;
-                resetPagination();
-                fetchAndDisplayScans();
-            });
 
             // Load user list when User Management tab is clicked
             document.getElementById('users-tab').addEventListener('click', function() {
@@ -1792,17 +1668,8 @@
                 document.getElementById('apiKey').value = config.api_key || '';
                 document.getElementById('scanDelaySeconds').value = config.scan_delay_seconds || 60;
                 
-                // Load RTSP URLs from config or generate them
-                if (config.camera_1_rtsp) {
-                    document.getElementById('camera1Rtsp').value = config.camera_1_rtsp;
-                } else {
-                    updateRtspUrls();
-                }
-                if (config.camera_2_rtsp) {
-                    document.getElementById('camera2Rtsp').value = config.camera_2_rtsp;
-                } else {
-                    updateRtspUrls();
-                }
+                // Update RTSP URLs
+                updateRtspUrls();
             } catch (error) {
                 console.error('Error loading configuration:', error);
             }
@@ -1817,35 +1684,8 @@
             const rtsp1 = `rtsp://${username}:${password}@${ip1}:554/avstream/channel=1/stream=0.sdp`;
             const rtsp2 = `rtsp://${username}:${password}@${ip2}:554/avstream/channel=1/stream=0.sdp`;
             
-            // Only update if not in edit mode
-            if (document.getElementById('camera1Rtsp').readOnly) {
-                document.getElementById('camera1Rtsp').value = rtsp1;
-            }
-            if (document.getElementById('camera2Rtsp').readOnly) {
-                document.getElementById('camera2Rtsp').value = rtsp2;
-            }
-        }
-
-        function toggleRtspEdit(inputId) {
-            const input = document.getElementById(inputId);
-            const button = input.nextElementSibling;
-            const icon = button.querySelector('i');
-            
-            if (input.readOnly) {
-                // Enable editing
-                input.readOnly = false;
-                input.focus();
-                icon.className = 'fas fa-save';
-                button.title = 'Save RTSP URL';
-            } else {
-                // Save and disable editing
-                input.readOnly = true;
-                icon.className = 'fas fa-edit';
-                button.title = 'Edit RTSP URL';
-                
-                // Show notification
-                showNotification('RTSP URL updated. Click "Update Camera Config" to save changes.', 'info');
-            }
+            document.getElementById('camera1Rtsp').value = rtsp1;
+            document.getElementById('camera2Rtsp').value = rtsp2;
         }
 
         async function updateCameraConfig() {
@@ -1855,9 +1695,7 @@
                 camera_1_ip: document.getElementById('camera1Ip').value,
                 camera_2_ip: document.getElementById('camera2Ip').value,
                 camera_1_enabled: document.getElementById('camera1Enabled').checked,
-                camera_2_enabled: document.getElementById('camera2Enabled').checked,
-                camera_1_rtsp: document.getElementById('camera1Rtsp').value,
-                camera_2_rtsp: document.getElementById('camera2Rtsp').value
+                camera_2_enabled: document.getElementById('camera2Enabled').checked
             };
 
             try {
