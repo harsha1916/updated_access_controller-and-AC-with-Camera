@@ -1341,6 +1341,183 @@ def update_config():
         logging.error(f"Error updating configuration: {e}")
         return jsonify({"status": "error", "message": f"Error updating configuration: {str(e)}"}), 500
 
+# --- Network Configuration ---
+@app.route("/get_network_status", methods=["GET"])
+def get_network_status():
+    """Get current network status and configuration."""
+    try:
+        import subprocess
+        import socket
+        
+        # Get current IP address
+        current_ip = "Unknown"
+        interface = "Unknown"
+        gateway = "Unknown"
+        
+        try:
+            # Get current IP
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.connect(("8.8.8.8", 80))
+            current_ip = s.getsockname()[0]
+            s.close()
+            
+            # Get network interface info
+            result = subprocess.run(['ip', 'route', 'get', '8.8.8.8'], capture_output=True, text=True)
+            if result.returncode == 0:
+                lines = result.stdout.strip().split('\n')
+                for line in lines:
+                    if 'dev' in line:
+                        parts = line.split()
+                        for i, part in enumerate(parts):
+                            if part == 'dev':
+                                interface = parts[i + 1]
+                                break
+                    if 'via' in line:
+                        parts = line.split()
+                        for i, part in enumerate(parts):
+                            if part == 'via':
+                                gateway = parts[i + 1]
+                                break
+        except Exception as e:
+            logging.warning(f"Could not get network info: {e}")
+        
+        return jsonify({
+            "status": "success",
+            "current_ip": current_ip,
+            "interface": interface,
+            "gateway": gateway
+        })
+        
+    except Exception as e:
+        logging.error(f"Error getting network status: {e}")
+        return jsonify({"status": "error", "message": f"Error getting network status: {str(e)}"}), 500
+
+@app.route("/apply_network_config", methods=["POST"])
+@require_api_key
+def apply_network_config():
+    """Apply static IP network configuration."""
+    try:
+        config_data = request.get_json()
+        
+        if not config_data:
+            return jsonify({"status": "error", "message": "No configuration data provided"}), 400
+        
+        static_ip = config_data.get('static_ip')
+        static_gateway = config_data.get('static_gateway', '192.168.1.1')
+        static_dns = config_data.get('static_dns', '8.8.8.8')
+        static_subnet = config_data.get('static_subnet', '255.255.255.0')
+        enable_static_ip = config_data.get('enable_static_ip', True)
+        
+        if not static_ip:
+            return jsonify({"status": "error", "message": "Static IP address is required"}), 400
+        
+        # Create network configuration script
+        network_script = f"""#!/bin/bash
+# Network configuration script for MaxPark RFID System
+
+# Backup current configuration
+cp /etc/dhcpcd.conf /etc/dhcpcd.conf.backup.$(date +%Y%m%d_%H%M%S)
+
+# Configure static IP
+if [ "{enable_static_ip}" = "true" ]; then
+    # Add static IP configuration to dhcpcd.conf
+    cat >> /etc/dhcpcd.conf << EOF
+
+# MaxPark RFID System Static IP Configuration
+interface eth0
+static ip_address={static_ip}/24
+static routers={static_gateway}
+static domain_name_servers={static_dns}
+EOF
+else
+    # Remove static IP configuration
+    sed -i '/# MaxPark RFID System Static IP Configuration/,/^$/d' /etc/dhcpcd.conf
+fi
+
+# Restart networking service
+systemctl restart dhcpcd
+systemctl restart networking
+
+# Wait a moment for network to come up
+sleep 5
+
+# Restart the RFID system
+systemctl restart rfid-access-control || true
+"""
+        
+        # Write script to temporary file
+        script_path = "/tmp/configure_network.sh"
+        with open(script_path, 'w') as f:
+            f.write(network_script)
+        
+        # Make script executable
+        import stat
+        os.chmod(script_path, stat.S_IRWXU | stat.S_IRGRP | stat.S_IROTH)
+        
+        # Execute script in background
+        import subprocess
+        subprocess.Popen(['bash', script_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        
+        logging.info(f"Network configuration applied: {static_ip}")
+        return jsonify({
+            "status": "success", 
+            "message": f"Network configuration applied. New IP: {static_ip}",
+            "new_ip": static_ip
+        })
+        
+    except Exception as e:
+        logging.error(f"Error applying network configuration: {e}")
+        return jsonify({"status": "error", "message": f"Error applying network configuration: {str(e)}"}), 500
+
+@app.route("/reset_network_dhcp", methods=["POST"])
+@require_api_key
+def reset_network_dhcp():
+    """Reset network configuration to DHCP."""
+    try:
+        # Create DHCP reset script
+        reset_script = """#!/bin/bash
+# Reset network to DHCP for MaxPark RFID System
+
+# Backup current configuration
+cp /etc/dhcpcd.conf /etc/dhcpcd.conf.backup.$(date +%Y%m%d_%H%M%S)
+
+# Remove static IP configuration
+sed -i '/# MaxPark RFID System Static IP Configuration/,/^$/d' /etc/dhcpcd.conf
+
+# Restart networking service
+systemctl restart dhcpcd
+systemctl restart networking
+
+# Wait a moment for network to come up
+sleep 5
+
+# Restart the RFID system
+systemctl restart rfid-access-control || true
+"""
+        
+        # Write script to temporary file
+        script_path = "/tmp/reset_network_dhcp.sh"
+        with open(script_path, 'w') as f:
+            f.write(reset_script)
+        
+        # Make script executable
+        import stat
+        os.chmod(script_path, stat.S_IRWXU | stat.S_IRGRP | stat.S_IROTH)
+        
+        # Execute script in background
+        import subprocess
+        subprocess.Popen(['bash', script_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        
+        logging.info("Network configuration reset to DHCP")
+        return jsonify({
+            "status": "success", 
+            "message": "Network configuration reset to DHCP"
+        })
+        
+    except Exception as e:
+        logging.error(f"Error resetting network to DHCP: {e}")
+        return jsonify({"status": "error", "message": f"Error resetting network: {str(e)}"}), 500
+
 # --- Storage & Analytics ---
 @app.route("/get_storage_stats", methods=["GET"])
 def get_storage_stats():
