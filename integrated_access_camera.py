@@ -1257,6 +1257,8 @@ def get_config():
             "camera_2_ip": os.getenv("CAMERA_2_IP", "192.168.1.202"),
             "camera_1_enabled": os.getenv("CAMERA_1_ENABLED", "true").lower() == "true",
             "camera_2_enabled": os.getenv("CAMERA_2_ENABLED", "true").lower() == "true",
+            "camera_1_rtsp": os.getenv("CAMERA_1_RTSP", ""),
+            "camera_2_rtsp": os.getenv("CAMERA_2_RTSP", ""),
             "s3_api_url": os.getenv("S3_API_URL", "https://api.easyparkai.com/api/Common/Upload?modulename=anpr"),
             "max_retries": int(os.getenv("MAX_RETRIES", "5")),
             "retry_delay": int(os.getenv("RETRY_DELAY", "5")),

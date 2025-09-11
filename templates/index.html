@@ -1678,8 +1678,17 @@
                 document.getElementById('apiKey').value = config.api_key || '';
                 document.getElementById('scanDelaySeconds').value = config.scan_delay_seconds || 60;
                 
-                // Update RTSP URLs
-                updateRtspUrls();
+                // Load RTSP URLs from config or generate them
+                if (config.camera_1_rtsp) {
+                    document.getElementById('camera1Rtsp').value = config.camera_1_rtsp;
+                } else {
+                    updateRtspUrls();
+                }
+                if (config.camera_2_rtsp) {
+                    document.getElementById('camera2Rtsp').value = config.camera_2_rtsp;
+                } else {
+                    updateRtspUrls();
+                }
             } catch (error) {
                 console.error('Error loading configuration:', error);
             }
@@ -1694,8 +1703,13 @@
             const rtsp1 = `rtsp://${username}:${password}@${ip1}:554/avstream/channel=1/stream=0.sdp`;
             const rtsp2 = `rtsp://${username}:${password}@${ip2}:554/avstream/channel=1/stream=0.sdp`;
             
-            document.getElementById('camera1Rtsp').value = rtsp1;
-            document.getElementById('camera2Rtsp').value = rtsp2;
+            // Only update if fields are readonly (not being edited)
+            if (document.getElementById('camera1Rtsp').readOnly) {
+                document.getElementById('camera1Rtsp').value = rtsp1;
+            }
+            if (document.getElementById('camera2Rtsp').readOnly) {
+                document.getElementById('camera2Rtsp').value = rtsp2;
+            }
         }
 
         function toggleRtspEdit(inputId) {

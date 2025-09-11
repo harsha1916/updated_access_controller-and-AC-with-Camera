@@ -7,9 +7,14 @@ CAMERA_PASSWORD = os.getenv("CAMERA_PASSWORD", "admin")
 CAMERA_1_IP = os.getenv("CAMERA_1_IP", "192.168.1.201")
 CAMERA_2_IP = os.getenv("CAMERA_2_IP", "192.168.1.202")
 
+# Get custom RTSP URLs if they exist, otherwise generate them
+CAMERA_1_RTSP = os.getenv("CAMERA_1_RTSP", "")
+CAMERA_2_RTSP = os.getenv("CAMERA_2_RTSP", "")
+
+# Use custom RTSP URLs if provided, otherwise generate from IP/credentials
 RTSP_CAMERAS = {
-    "camera_1": f"rtsp://{CAMERA_USERNAME}:{CAMERA_PASSWORD}@{CAMERA_1_IP}:554/avstream/channel=1/stream=0.sdp",
-    "camera_2": f"rtsp://{CAMERA_USERNAME}:{CAMERA_PASSWORD}@{CAMERA_2_IP}:554/avstream/channel=1/stream=0.sdp"
+    "camera_1": CAMERA_1_RTSP if CAMERA_1_RTSP else f"rtsp://{CAMERA_USERNAME}:{CAMERA_PASSWORD}@{CAMERA_1_IP}:554/avstream/channel=1/stream=0.sdp",
+    "camera_2": CAMERA_2_RTSP if CAMERA_2_RTSP else f"rtsp://{CAMERA_USERNAME}:{CAMERA_PASSWORD}@{CAMERA_2_IP}:554/avstream/channel=1/stream=0.sdp"
 }
 
 # API Configuration
