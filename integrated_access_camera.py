@@ -1303,6 +1303,8 @@ def update_config():
             "camera_2_ip": "CAMERA_2_IP",
             "camera_1_enabled": "CAMERA_1_ENABLED",
             "camera_2_enabled": "CAMERA_2_ENABLED",
+            "camera_1_rtsp": "CAMERA_1_RTSP",
+            "camera_2_rtsp": "CAMERA_2_RTSP",
             "s3_api_url": "S3_API_URL",
             "max_retries": "MAX_RETRIES",
             "retry_delay": "RETRY_DELAY",

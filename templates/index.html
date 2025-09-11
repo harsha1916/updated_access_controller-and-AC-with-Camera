@@ -592,11 +592,21 @@
                                 
                                 <div class="mb-3">
                                     <label for="camera1Rtsp" class="form-label">Camera 1 RTSP URL</label>
-                                    <input type="text" class="form-control" id="camera1Rtsp" readonly>
+                                    <div class="input-group">
+                                        <input type="text" class="form-control" id="camera1Rtsp" readonly>
+                                        <button class="btn btn-outline-secondary" type="button" onclick="toggleRtspEdit('camera1Rtsp')">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                    </div>
                                 </div>
                                 <div class="mb-3">
                                     <label for="camera2Rtsp" class="form-label">Camera 2 RTSP URL</label>
-                                    <input type="text" class="form-control" id="camera2Rtsp" readonly>
+                                    <div class="input-group">
+                                        <input type="text" class="form-control" id="camera2Rtsp" readonly>
+                                        <button class="btn btn-outline-secondary" type="button" onclick="toggleRtspEdit('camera2Rtsp')">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                    </div>
                                 </div>
                                 <button type="submit" class="btn btn-primary">
                                     <i class="fas fa-save"></i> Update Camera Config
@@ -1688,6 +1698,28 @@
             document.getElementById('camera2Rtsp').value = rtsp2;
         }
 
+        function toggleRtspEdit(inputId) {
+            const input = document.getElementById(inputId);
+            const button = input.nextElementSibling;
+            const icon = button.querySelector('i');
+            
+            if (input.readOnly) {
+                // Enable editing
+                input.readOnly = false;
+                input.focus();
+                icon.className = 'fas fa-save';
+                button.title = 'Save RTSP URL';
+            } else {
+                // Save and disable editing
+                input.readOnly = true;
+                icon.className = 'fas fa-edit';
+                button.title = 'Edit RTSP URL';
+                
+                // Show notification
+                showNotification('RTSP URL updated. Click "Update Camera Config" to save changes.', 'info');
+            }
+        }
+
         async function updateCameraConfig() {
             const config = {
                 camera_username: document.getElementById('cameraUsername').value,
@@ -1695,7 +1727,9 @@
                 camera_1_ip: document.getElementById('camera1Ip').value,
                 camera_2_ip: document.getElementById('camera2Ip').value,
                 camera_1_enabled: document.getElementById('camera1Enabled').checked,
-                camera_2_enabled: document.getElementById('camera2Enabled').checked
+                camera_2_enabled: document.getElementById('camera2Enabled').checked,
+                camera_1_rtsp: document.getElementById('camera1Rtsp').value,
+                camera_2_rtsp: document.getElementById('camera2Rtsp').value
             };
 
             try {
