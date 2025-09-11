@@ -992,15 +992,46 @@ def relay():
 # --- Transactions ---
 @app.route("/get_transactions", methods=["GET"])
 def get_transactions():
-    """Fetch the latest RFID access transactions from Firebase or local cache."""
+    """Fetch RFID access transactions with date filtering and pagination."""
     try:
+        # Get query parameters
+        limit = int(request.args.get('limit', 50))  # Default 50, was 10
+        offset = int(request.args.get('offset', 0))
+        date_filter = request.args.get('date')  # YYYY-MM-DD format
+        show_today_only = request.args.get('today_only', 'false').lower() == 'true'
+        
         transactions = []
+        total_count = 0
+        
+        # Calculate date range if filtering by date
+        start_date = None
+        end_date = None
+        if date_filter:
+            try:
+                start_date = datetime.strptime(date_filter, '%Y-%m-%d')
+                end_date = start_date + timedelta(days=1)
+            except ValueError:
+                return jsonify({"status": "error", "message": "Invalid date format. Use YYYY-MM-DD"}), 400
+        elif show_today_only:
+            today = datetime.now().date()
+            start_date = datetime.combine(today, datetime.min.time())
+            end_date = start_date + timedelta(days=1)
+        
         if db is not None and is_internet_available():
             try:
-                docs_iter = db.collection("transactions") \
-                              .order_by("timestamp", direction=firestore.Query.DESCENDING) \
-                              .limit(10).stream()
-                docs = list(docs_iter)
+                query = db.collection("transactions").order_by("timestamp", direction=firestore.Query.DESCENDING)
+                
+                # Apply date filtering if specified
+                if start_date and end_date:
+                    query = query.where("timestamp", ">=", start_date).where("timestamp", "<", end_date)
+                
+                # Get total count for pagination
+                total_docs = list(query.stream())
+                total_count = len(total_docs)
+                
+                # Apply pagination
+                docs = total_docs[offset:offset + limit]
+                
             except google.api_core.exceptions.DeadlineExceeded:
                 logging.warning("Firestore transaction timeout ....")
                 docs = []
@@ -1019,13 +1050,47 @@ def get_transactions():
                 })
 
             if transactions:
-                return jsonify(transactions)
+                return jsonify({
+                    "transactions": transactions,
+                    "total": total_count,
+                    "limit": limit,
+                    "offset": offset,
+                    "has_more": offset + limit < total_count
+                })
 
         # Offline (or no DB): serve cached if available
         cached = read_json_or_default(TRANSACTION_CACHE_FILE, [])
         if cached:
-            return jsonify(cached[-10:])
-        return jsonify([{"message": "No recent transactions"}])
+            # Apply date filtering to cached data
+            filtered_cached = cached
+            if start_date and end_date:
+                filtered_cached = []
+                for tx in cached:
+                    tx_timestamp = tx.get('timestamp', 0)
+                    if isinstance(tx_timestamp, (int, float)):
+                        tx_date = datetime.fromtimestamp(tx_timestamp)
+                        if start_date <= tx_date < end_date:
+                            filtered_cached.append(tx)
+            
+            total_count = len(filtered_cached)
+            paginated_cached = filtered_cached[offset:offset + limit]
+            
+            return jsonify({
+                "transactions": paginated_cached,
+                "total": total_count,
+                "limit": limit,
+                "offset": offset,
+                "has_more": offset + limit < total_count
+            })
+        
+        return jsonify({
+            "transactions": [],
+            "total": 0,
+            "limit": limit,
+            "offset": offset,
+            "has_more": False,
+            "message": "No transactions found"
+        })
     except Exception as e:
         return jsonify({"status": "error", "message": f"Error fetching transactions: {str(e)}"}), 500
 
@@ -1257,6 +1322,8 @@ def get_config():
             "camera_2_ip": os.getenv("CAMERA_2_IP", "192.168.1.202"),
             "camera_1_enabled": os.getenv("CAMERA_1_ENABLED", "true").lower() == "true",
             "camera_2_enabled": os.getenv("CAMERA_2_ENABLED", "true").lower() == "true",
+            "camera_1_rtsp": os.getenv("CAMERA_1_RTSP", ""),
+            "camera_2_rtsp": os.getenv("CAMERA_2_RTSP", ""),
             "s3_api_url": os.getenv("S3_API_URL", "https://api.easyparkai.com/api/Common/Upload?modulename=anpr"),
             "max_retries": int(os.getenv("MAX_RETRIES", "5")),
             "retry_delay": int(os.getenv("RETRY_DELAY", "5")),
@@ -1303,6 +1370,8 @@ def update_config():
             "camera_2_ip": "CAMERA_2_IP",
             "camera_1_enabled": "CAMERA_1_ENABLED",
             "camera_2_enabled": "CAMERA_2_ENABLED",
+            "camera_1_rtsp": "CAMERA_1_RTSP",
+            "camera_2_rtsp": "CAMERA_2_RTSP",
             "s3_api_url": "S3_API_URL",
             "max_retries": "MAX_RETRIES",
             "retry_delay": "RETRY_DELAY",
