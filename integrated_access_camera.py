@@ -1331,6 +1331,10 @@ def update_config():
                 f.write(f"{key}={value}\n")
         
         logging.info("Configuration updated successfully")
+        
+        # Reload environment variables for current session
+        load_dotenv()
+        
         return jsonify({"status": "success", "message": "Configuration updated successfully"})
         
     except Exception as e:
