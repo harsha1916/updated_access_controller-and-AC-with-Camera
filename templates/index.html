@@ -791,7 +791,12 @@
                                                 </label>
                                             </div>
                                         </div>
-                                        <button type="submit" class="btn btn-warning">
+                                        <div class="alert alert-warning">
+                                            <i class="fas fa-exclamation-triangle"></i>
+                                            <strong>Warning:</strong> Changing network configuration will temporarily disconnect your current session. 
+                                            You may need to reconnect using the new IP address. Make sure you have physical access to the device.
+                                        </div>
+                                        <button type="submit" class="btn btn-warning" onclick="return confirmNetworkChange()">
                                             <i class="fas fa-network-wired"></i> Apply Network Configuration
                                         </button>
                                         <button type="button" class="btn btn-outline-danger ms-2" onclick="resetToDhcp()">
@@ -863,6 +868,29 @@
                                         <i class="fas fa-save"></i> Change Password
                                     </button>
                                 </div>
+                            </form>
+                        </div>
+                    </div>
+                    
+                    <!-- Emergency Password Reset Section -->
+                    <div class="card mt-4">
+                        <div class="card-header">
+                            <h5 class="mb-0"><i class="fas fa-exclamation-triangle text-warning"></i> Emergency Password Reset</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="alert alert-warning">
+                                <i class="fas fa-exclamation-triangle"></i>
+                                <strong>Warning:</strong> This will reset the password to default. Use only if you're locked out.
+                            </div>
+                            <form id="resetPasswordForm">
+                                <div class="mb-3">
+                                    <label for="resetPassword" class="form-label">New Password</label>
+                                    <input type="password" class="form-control" id="resetPassword" placeholder="Enter new password" required>
+                                    <div class="form-text">Leave empty to reset to default: admin123</div>
+                                </div>
+                                <button type="submit" class="btn btn-warning" onclick="return confirm('Are you sure you want to reset the password?')">
+                                    <i class="fas fa-key"></i> Reset Password
+                                </button>
                             </form>
                         </div>
                     </div>
@@ -1501,6 +1529,12 @@
                 e.preventDefault();
                 await changePassword();
             });
+
+            // Reset password form
+            document.getElementById('resetPasswordForm').addEventListener('submit', async function(e) {
+                e.preventDefault();
+                await resetPassword();
+            });
         }
 
         // =========================
@@ -2057,6 +2091,39 @@
                 }
             } catch (error) {
                 showNotification('Password change error: ' + error.message, 'danger');
+            }
+        }
+
+        async function resetPassword() {
+            const newPassword = document.getElementById('resetPassword').value;
+            const finalPassword = newPassword || 'admin123';
+
+            try {
+                const response = await fetch('/reset_password', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-API-Key': getApiKey()
+                    },
+                    body: JSON.stringify({
+                        new_password: finalPassword
+                    })
+                });
+
+                const result = await response.json();
+                if (result.status === 'success') {
+                    showNotification(`Password reset successfully! New password: ${finalPassword}`, 'success');
+                    document.getElementById('resetPasswordForm').reset();
+                    
+                    // Show the new password prominently
+                    setTimeout(() => {
+                        showNotification(`IMPORTANT: Your new password is: ${finalPassword}`, 'info');
+                    }, 2000);
+                } else {
+                    showNotification(result.message || 'Password reset failed', 'danger');
+                }
+            } catch (error) {
+                showNotification('Password reset error: ' + error.message, 'danger');
             }
         }
 
@@ -2829,6 +2896,26 @@
             }
         }
 
+        function confirmNetworkChange() {
+            const staticIp = document.getElementById('staticIp').value;
+            const enableStaticIp = document.getElementById('enableStaticIp').checked;
+            
+            if (!staticIp && enableStaticIp) {
+                showNotification('Please enter a static IP address', 'warning');
+                return false;
+            }
+            
+            let message = 'This will change the network configuration. ';
+            if (enableStaticIp) {
+                message += `The device will be accessible at ${staticIp}. `;
+            } else {
+                message += 'The device will return to DHCP mode. ';
+            }
+            message += 'You may lose connection temporarily. Make sure you have physical access to reconnect. Continue?';
+            
+            return confirm(message);
+        }
+
         async function applyNetworkConfiguration() {
             const config = {
                 static_ip: document.getElementById('staticIp').value,
@@ -2838,7 +2925,7 @@
                 enable_static_ip: document.getElementById('enableStaticIp').checked
             };
 
-            if (!config.static_ip) {
+            if (!config.static_ip && config.enable_static_ip) {
                 showNotification('Please enter a static IP address', 'warning');
                 return;
             }
@@ -2856,10 +2943,17 @@
 
                     const result = await response.json();
                     if (result.status === 'success') {
-                        showNotification('Network configuration applied! System will restart in 10 seconds.', 'success');
-                        setTimeout(() => {
-                            showNotification('Please reconnect to the new IP address: ' + config.static_ip, 'info');
-                        }, 10000);
+                        if (config.enable_static_ip) {
+                            showNotification(`Network configuration applied! New IP: ${config.static_ip}. You may lose connection temporarily.`, 'success');
+                            setTimeout(() => {
+                                showNotification(`Please reconnect using: http://${config.static_ip}:5001`, 'info');
+                            }, 3000);
+                        } else {
+                            showNotification('Network configuration reset to DHCP. You may lose connection temporarily.', 'success');
+                            setTimeout(() => {
+                                showNotification('Please check your router for the new DHCP IP address.', 'info');
+                            }, 3000);
+                        }
                     } else {
                         showNotification(`Error: ${result.message}`, 'danger');
                     }

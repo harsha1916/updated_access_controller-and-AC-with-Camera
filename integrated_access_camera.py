@@ -875,6 +875,65 @@ def change_password():
         logging.error(f"Password change error: {e}")
         return jsonify({"status": "error", "message": "Password change failed"}), 500
 
+@app.route("/reset_password", methods=["POST"])
+@require_api_key
+def reset_password():
+    """Reset admin password to default (emergency use only)"""
+    global ADMIN_PASSWORD_HASH
+    try:
+        data = request.get_json()
+        new_password = data.get('new_password', 'admin123')
+        
+        # Update password hash
+        new_password_hash = hash_password(new_password)
+        ADMIN_PASSWORD_HASH = new_password_hash
+        
+        # Update .env file
+        env_file = ".env"
+        env_vars = {}
+        
+        # Read existing .env file if it exists
+        if os.path.exists(env_file):
+            with open(env_file, 'r') as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith('#') and '=' in line:
+                        key, value = line.split('=', 1)
+                        env_vars[key] = value
+        
+        env_vars['ADMIN_PASSWORD_HASH'] = new_password_hash
+        
+        with open(env_file, 'w') as f:
+            for key, value in env_vars.items():
+                f.write(f"{key}={value}\n")
+        
+        logging.warning(f"Password reset via API - new password: {new_password}")
+        return jsonify({
+            "status": "success", 
+            "message": f"Password reset successfully. New password: {new_password}",
+            "new_password": new_password
+        })
+        
+    except Exception as e:
+        logging.error(f"Password reset error: {e}")
+        return jsonify({"status": "error", "message": f"Password reset failed"}), 500
+
+@app.route("/get_password_info", methods=["GET"])
+@require_api_key
+def get_password_info():
+    """Get password information (for admin purposes)"""
+    try:
+        return jsonify({
+            "status": "success",
+            "username": ADMIN_USERNAME,
+            "password_hash": ADMIN_PASSWORD_HASH,
+            "default_password": "admin123",
+            "note": "Change default password after first login"
+        })
+    except Exception as e:
+        logging.error(f"Error getting password info: {e}")
+        return jsonify({"status": "error", "message": f"Error getting password info: {str(e)}"}), 500
+
 @app.route("/status")
 def system_status():
     """Get system status information"""
@@ -1398,6 +1457,55 @@ def get_network_status():
         logging.error(f"Error getting network status: {e}")
         return jsonify({"status": "error", "message": f"Error getting network status: {str(e)}"}), 500
 
+@app.route("/get_network_config_status", methods=["GET"])
+def get_network_config_status():
+    """Get current network configuration status and logs."""
+    try:
+        # Check if network log exists
+        log_file = "/var/log/maxpark_network.log"
+        log_exists = os.path.exists(log_file)
+        
+        # Get last few lines of network log if it exists
+        recent_logs = []
+        if log_exists:
+            try:
+                with open(log_file, 'r') as f:
+                    lines = f.readlines()
+                    recent_logs = lines[-10:]  # Last 10 lines
+            except Exception as e:
+                logging.error(f"Error reading network log: {e}")
+        
+        # Check dhcpcd.conf for MaxPark configuration
+        dhcpcd_config = ""
+        try:
+            with open('/etc/dhcpcd.conf', 'r') as f:
+                content = f.read()
+                if '# MaxPark RFID System Static IP Configuration' in content:
+                    # Extract MaxPark configuration section
+                    lines = content.split('\n')
+                    in_maxpark_section = False
+                    for line in lines:
+                        if '# MaxPark RFID System Static IP Configuration' in line:
+                            in_maxpark_section = True
+                        elif in_maxpark_section and line.strip() == '':
+                            break
+                        elif in_maxpark_section:
+                            dhcpcd_config += line + '\n'
+        except Exception as e:
+            logging.error(f"Error reading dhcpcd.conf: {e}")
+        
+        return jsonify({
+            "status": "success",
+            "log_exists": log_exists,
+            "recent_logs": recent_logs,
+            "dhcpcd_config": dhcpcd_config.strip(),
+            "has_static_config": bool(dhcpcd_config.strip())
+        })
+        
+    except Exception as e:
+        logging.error(f"Error getting network config status: {e}")
+        return jsonify({"status": "error", "message": f"Error getting network config status: {str(e)}"}), 500
+
 @app.route("/apply_network_config", methods=["POST"])
 @require_api_key
 def apply_network_config():
@@ -1417,17 +1525,23 @@ def apply_network_config():
         if not static_ip:
             return jsonify({"status": "error", "message": "Static IP address is required"}), 400
         
-        # Create network configuration script
+        # Create network configuration script with connection preservation
         network_script = f"""#!/bin/bash
 # Network configuration script for MaxPark RFID System
 
+# Log the configuration attempt
+echo "$(date): Starting network configuration to {static_ip}" >> /var/log/maxpark_network.log
+
 # Backup current configuration
-cp /etc/dhcpcd.conf /etc/dhcpcd.conf.backup.$(date +%Y%m%d_%H%M%S)
+sudo cp /etc/dhcpcd.conf /etc/dhcpcd.conf.backup.$(date +%Y%m%d_%H%M%S)
 
 # Configure static IP
 if [ "{enable_static_ip}" = "true" ]; then
+    # Remove any existing MaxPark configuration first
+    sudo sed -i '/# MaxPark RFID System Static IP Configuration/,/^$/d' /etc/dhcpcd.conf
+    
     # Add static IP configuration to dhcpcd.conf
-    cat >> /etc/dhcpcd.conf << EOF
+    sudo tee -a /etc/dhcpcd.conf > /dev/null << EOF
 
 # MaxPark RFID System Static IP Configuration
 interface eth0
@@ -1435,20 +1549,42 @@ static ip_address={static_ip}/24
 static routers={static_gateway}
 static domain_name_servers={static_dns}
 EOF
+    
+    echo "$(date): Static IP configuration written to dhcpcd.conf" >> /var/log/maxpark_network.log
 else
     # Remove static IP configuration
-    sed -i '/# MaxPark RFID System Static IP Configuration/,/^$/d' /etc/dhcpcd.conf
+    sudo sed -i '/# MaxPark RFID System Static IP Configuration/,/^$/d' /etc/dhcpcd.conf
+    echo "$(date): Static IP configuration removed from dhcpcd.conf" >> /var/log/maxpark_network.log
 fi
 
-# Restart networking service
-systemctl restart dhcpcd
-systemctl restart networking
+# Test network connectivity before applying changes
+if ping -c 1 -W 3 {static_gateway} > /dev/null 2>&1; then
+    echo "$(date): Gateway {static_gateway} is reachable, applying configuration" >> /var/log/maxpark_network.log
+    
+    # Apply configuration immediately
+    sudo systemctl restart dhcpcd
+    sleep 3
+    
+    # Test new IP connectivity
+    if ping -c 1 -W 5 {static_ip} > /dev/null 2>&1; then
+        echo "$(date): New IP {static_ip} is reachable, configuration successful" >> /var/log/maxpark_network.log
+        # Restart RFID system
+        sudo systemctl restart rfid-access-control || true
+    else
+        echo "$(date): New IP {static_ip} not reachable, rolling back" >> /var/log/maxpark_network.log
+        # Rollback to backup
+        sudo cp /etc/dhcpcd.conf.backup.* /etc/dhcpcd.conf 2>/dev/null || true
+        sudo systemctl restart dhcpcd
+    fi
+else
+    echo "$(date): Gateway {static_gateway} not reachable, configuration may fail" >> /var/log/maxpark_network.log
+    # Still apply but with warning
+    sudo systemctl restart dhcpcd
+    sleep 3
+    sudo systemctl restart rfid-access-control || true
+fi
 
-# Wait a moment for network to come up
-sleep 5
-
-# Restart the RFID system
-systemctl restart rfid-access-control || true
+echo "$(date): Network configuration completed" >> /var/log/maxpark_network.log
 """
         
         # Write script to temporary file
@@ -1460,9 +1596,22 @@ systemctl restart rfid-access-control || true
         import stat
         os.chmod(script_path, stat.S_IRWXU | stat.S_IRGRP | stat.S_IROTH)
         
-        # Execute script in background
+        # Execute script in background with proper error handling
         import subprocess
-        subprocess.Popen(['bash', script_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        try:
+            # Try to run with sudo first, fallback to regular execution
+            result = subprocess.run(['sudo', 'bash', script_path], 
+                                  capture_output=True, text=True, timeout=30)
+            if result.returncode != 0:
+                logging.warning(f"Network configuration script failed: {result.stderr}")
+                # Try without sudo as fallback
+                subprocess.Popen(['bash', script_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except subprocess.TimeoutExpired:
+            logging.error("Network configuration script timed out")
+        except Exception as e:
+            logging.error(f"Error executing network configuration script: {e}")
+            # Fallback to regular execution
+            subprocess.Popen(['bash', script_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         
         logging.info(f"Network configuration applied: {static_ip}")
         return jsonify({
@@ -1484,21 +1633,26 @@ def reset_network_dhcp():
         reset_script = """#!/bin/bash
 # Reset network to DHCP for MaxPark RFID System
 
+# Log the reset attempt
+echo "$(date): Resetting network to DHCP" >> /var/log/maxpark_network.log
+
 # Backup current configuration
-cp /etc/dhcpcd.conf /etc/dhcpcd.conf.backup.$(date +%Y%m%d_%H%M%S)
+sudo cp /etc/dhcpcd.conf /etc/dhcpcd.conf.backup.$(date +%Y%m%d_%H%M%S)
 
 # Remove static IP configuration
-sed -i '/# MaxPark RFID System Static IP Configuration/,/^$/d' /etc/dhcpcd.conf
+sudo sed -i '/# MaxPark RFID System Static IP Configuration/,/^$/d' /etc/dhcpcd.conf
 
 # Restart networking service
-systemctl restart dhcpcd
-systemctl restart networking
+sudo systemctl restart dhcpcd
+sudo systemctl restart networking
 
 # Wait a moment for network to come up
 sleep 5
 
 # Restart the RFID system
-systemctl restart rfid-access-control || true
+sudo systemctl restart rfid-access-control || true
+
+echo "$(date): Network reset to DHCP completed" >> /var/log/maxpark_network.log
 """
         
         # Write script to temporary file
