@@ -691,6 +691,49 @@
                 </div>
             </div>
 
+            <!-- Wiegand Configuration -->
+            <div class="row mt-4">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0"><i class="fas fa-id-card"></i> Wiegand Configuration</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="wiegandBitsReader1" class="form-label">Reader 1 Wiegand Bits</label>
+                                        <select class="form-select" id="wiegandBitsReader1">
+                                            <option value="26">26-bit Wiegand</option>
+                                            <option value="34">34-bit Wiegand</option>
+                                        </select>
+                                        <div class="form-text">Select Wiegand format for Reader 1 (Camera 1)</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="wiegandBitsReader2" class="form-label">Reader 2 Wiegand Bits</label>
+                                        <select class="form-select" id="wiegandBitsReader2">
+                                            <option value="26">26-bit Wiegand</option>
+                                            <option value="34">34-bit Wiegand</option>
+                                        </select>
+                                        <div class="form-text">Select Wiegand format for Reader 2 (Camera 2)</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="alert alert-info">
+                                <i class="fas fa-info-circle"></i>
+                                <strong>Note:</strong> Changing Wiegand bit length requires system restart to take effect. 
+                                26-bit is most common, 34-bit provides larger card number range.
+                            </div>
+                            <button type="button" class="btn btn-success" onclick="saveWiegandConfig()">
+                                <i class="fas fa-save"></i> Save Wiegand Configuration
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Network Configuration -->
             <div class="row mt-4">
                 <div class="col-12">
@@ -1758,6 +1801,10 @@
                 document.getElementById('apiKey').value = config.api_key || '';
                 document.getElementById('scanDelaySeconds').value = config.scan_delay_seconds || 60;
                 
+                // Load Wiegand configuration
+                document.getElementById('wiegandBitsReader1').value = config.wiegand_bits_reader_1 || 26;
+                document.getElementById('wiegandBitsReader2').value = config.wiegand_bits_reader_2 || 26;
+                
                 // Load RTSP URLs from config or generate them
                 if (config.camera_1_rtsp) {
                     document.getElementById('camera1Rtsp').value = config.camera_1_rtsp;
@@ -1901,6 +1948,33 @@
                 }
             } catch (error) {
                 showNotification(`Error updating system config: ${error.message}`, 'danger');
+            }
+        }
+
+        async function saveWiegandConfig() {
+            const config = {
+                wiegand_bits_reader_1: parseInt(document.getElementById('wiegandBitsReader1').value),
+                wiegand_bits_reader_2: parseInt(document.getElementById('wiegandBitsReader2').value)
+            };
+
+            try {
+                const response = await fetch('/update_config', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-API-Key': getApiKey()
+                    },
+                    body: JSON.stringify(config)
+                });
+
+                const result = await response.json();
+                if (result.status === 'success') {
+                    showNotification('Wiegand configuration updated! System restart required for changes to take effect.', 'success');
+                } else {
+                    showNotification(`Error: ${result.message}`, 'danger');
+                }
+            } catch (error) {
+                showNotification(`Error updating Wiegand config: ${error.message}`, 'danger');
             }
         }
 

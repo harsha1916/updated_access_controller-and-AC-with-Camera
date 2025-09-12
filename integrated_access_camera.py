@@ -703,12 +703,13 @@ def capture_for_reader_async(reader_id: int, card_int: int):
 # Wiegand Decoder
 # =========================
 class WiegandDecoder:
-    def __init__(self, pi, d0, d1, callback, timeout_ms=25):
+    def __init__(self, pi, d0, d1, callback, timeout_ms=25, expected_bits=26):
         self.pi = pi
         self.d0 = d0
         self.d1 = d1
         self.callback = callback
         self.timeout_ms = timeout_ms
+        self.expected_bits = expected_bits  # Support 26 or 34 bit Wiegand
 
         self.value = 0
         self.bits = 0
@@ -737,7 +738,8 @@ class WiegandDecoder:
         self.bits += 1
         self.last_tick = tick
 
-        if self.bits == 26:
+        # Support both 26-bit and 34-bit Wiegand based on configuration
+        if self.bits == self.expected_bits:
             self.callback(self.bits, self.value)
             self.value = 0
             self.bits = 0
@@ -1265,7 +1267,9 @@ def get_config():
             "bind_ip": os.getenv("BIND_IP", "192.168.1.33"),
             "bind_port": int(os.getenv("BIND_PORT", "9000")),
             "api_key": os.getenv("API_KEY", "your-api-key-change-this"),
-            "scan_delay_seconds": int(os.getenv("SCAN_DELAY_SECONDS", "60"))
+            "scan_delay_seconds": int(os.getenv("SCAN_DELAY_SECONDS", "60")),
+            "wiegand_bits_reader_1": int(os.getenv("WIEGAND_BITS_READER_1", "26")),
+            "wiegand_bits_reader_2": int(os.getenv("WIEGAND_BITS_READER_2", "26"))
         }
         
         return jsonify(config)
@@ -1313,7 +1317,9 @@ def update_config():
             "bind_ip": "BIND_IP",
             "bind_port": "BIND_PORT",
             "api_key": "API_KEY",
-            "scan_delay_seconds": "SCAN_DELAY_SECONDS"
+            "scan_delay_seconds": "SCAN_DELAY_SECONDS",
+            "wiegand_bits_reader_1": "WIEGAND_BITS_READER_1",
+            "wiegand_bits_reader_2": "WIEGAND_BITS_READER_2"
         }
         
         for key, env_key in config_mapping.items():
@@ -2173,15 +2179,22 @@ def operate_relay(action, relay):
         logging.error(f"Error setting relay {relay}: {str(e)}")
 
 def handle_access(bits, value, reader_id):
-    """Handle Wiegand 26-bit read -> O(1) set lookups, immediate local decisions, async image capture."""
+    """Handle Wiegand 26-bit or 34-bit read -> O(1) set lookups, immediate local decisions, async image capture."""
     try:
         global relay_status
-        if bits != 26:
+        
+        # Accept both 26-bit and 34-bit Wiegand
+        if bits not in [26, 34]:
             logging.warning(f"Invalid Wiegand bits received: {bits} from reader {reader_id}")
             return
 
-        # 26-bit with parity removal (bits 1..24) -> int
-        card_int = int(f"{value:026b}"[1:25], 2)
+        # Process based on bit length
+        if bits == 26:
+            # 26-bit with parity removal (bits 1..24) -> int
+            card_int = int(f"{value:026b}"[1:25], 2)
+        elif bits == 34:
+            # 34-bit with parity removal (bits 1..32) -> int
+            card_int = int(f"{value:034b}"[1:33], 2)
 
         if not rate_limiter.should_process(card_int):
             logging.info(f"Duplicate scan ignored: {card_int}")
@@ -2430,8 +2443,12 @@ if pi is not None:
     try:
         print("Readers initialised successfully")
         print(pi)
-        wiegand1 = WiegandDecoder(pi, D0_PIN_1, D1_PIN_1, lambda b, v: handle_access(b, v, 1))
-        wiegand2 = WiegandDecoder(pi, D0_PIN_2, D1_PIN_2, lambda b, v: handle_access(b, v, 2))
+        # Get Wiegand bit configuration for each reader
+        wiegand_bits_1 = int(os.environ.get('WIEGAND_BITS_READER_1', '26'))
+        wiegand_bits_2 = int(os.environ.get('WIEGAND_BITS_READER_2', '26'))
+        
+        wiegand1 = WiegandDecoder(pi, D0_PIN_1, D1_PIN_1, lambda b, v: handle_access(b, v, 1), expected_bits=wiegand_bits_1)
+        wiegand2 = WiegandDecoder(pi, D0_PIN_2, D1_PIN_2, lambda b, v: handle_access(b, v, 2), expected_bits=wiegand_bits_2)
         # Initialize in-memory stores + sets at boot
         load_local_users()
         load_blocked_users()
